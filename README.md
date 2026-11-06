@@ -1,59 +1,34 @@
 # USDT Yield Platform
 
-Next.js 14 App Router · TypeScript · Tailwind · **Cloudflare KV (`USDTSTORAGE`)** · Automated **USDT TRC-20** deposits (TronGrid)
+Next.js 14 · Cloudflare Pages · KV **USDTSTORAGE** · USDT TRC-20 deposits
 
-## Live structure
+## Cloudflare Pages build settings (no local PC needed)
 
-### Pages
-| Route | Role |
-|-------|------|
-| `/` | Landing |
-| `/login` `/signup` | Auth |
-| `/dashboard` | Balances, deposit TRC-20, claim, txs |
-| `/plans` | Buy investment tiers |
-| `/invitation` | Referral link (20%) |
-| `/account` | Profile, withdraw, password, logout |
-| `/administrator` | Admin login |
-| `/administrator/dashboard` | Admin home |
-| `/administrator/deposits` | Multi USDT TRC-20 address CRUD |
+| Setting | Value |
+|---------|--------|
+| Framework preset | None / Next.js |
+| **Build command** | `npx @cloudflare/next-on-pages@1.13.16` |
+| **Build output directory** | `.vercel/output/static` |
+| Node version | 20 (`NODE_VERSION=20` env) |
+| Production branch | `main` |
 
-### APIs
-| Endpoint | Purpose |
-|----------|---------|
-| `POST /api/auth/signup` | Signup + free Bronze + 8-digit id |
-| `POST /api/auth/login` | User / admin login |
-| `POST /api/auth/logout` | Clear cookies |
-| `GET /api/me` | Session user + plans + txs |
-| `POST /api/deposit` | Create TRC-20 watch |
-| `POST /api/deposit/verify` | TronGrid auto-credit |
-| `GET /api/deposit/check-status` | UI poll |
-| `POST /api/plans/buy` | Purchase + 20% referral |
-| `POST /api/claim` | Daily yield |
-| `POST /api/withdraw` | Withdrawal queue |
-| `GET/POST /api/admin/deposit-addresses` | Address admin |
+### Bindings (Pages → Settings → Functions)
 
-### Core libs
-- `src/lib/kv.ts` → re-exports `kv-core` + `kv-deposit`
-- `src/lib/tron.ts` — TronGrid USDT TRC-20 client
-- `src/lib/deposit-engine.ts` — verify + idempotent credit
-- `src/middleware.ts` — protect dashboard & admin
+- **KV namespace binding** name: `USDTSTORAGE` → your KV namespace
 
-## Env
-```bash
-TRON_PRO_API_KEY=
-TRON_NETWORK=mainnet
-CRON_SECRET=
-```
+### Environment variables
 
-## Local
-```bash
-npm install
-npm run dev
-```
+- `TRON_PRO_API_KEY` — TronGrid API key
+- `TRON_NETWORK` — `mainnet` or `shasta`
+- `CRON_SECRET` — random secret for verify cron
+- `NODE_VERSION` — `20`
 
-Admin: `/administrator` → `admin` / `admin123`
+### After deploy
 
-## Deploy (Cloudflare Pages)
-1. Bind KV as **`USDTSTORAGE`**
-2. Flag `nodejs_compat`
-3. Connect this repo
+1. Open `https://YOUR-PROJECT.pages.dev/administrator`
+2. Login `admin` / `admin123`
+3. **Deposits** → add USDT TRC-20 addresses (`T…`)
+4. **Settings** → min withdrawal / deposit limits
+
+Admin: `/administrator`  
+User: `/signup` · `/dashboard`
