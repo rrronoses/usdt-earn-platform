@@ -10,10 +10,12 @@ export async function saveDepositAddresses(kv: KVNamespace, list: DepositAddress
   await putJSON(kv, keys.depositAddresses(), list);
 }
 
-export async function getActiveDepositAddress(kv: KVNamespace): Promise<DepositAddress | null> {
+/** Enabled addresses in the random assignment pool (active === true). */
+export async function listEnabledDepositAddresses(kv: KVNamespace): Promise<DepositAddress[]> {
   const list = await listDepositAddresses(kv);
-  const active = list.find((a) => a.active) || list[0];
-  if (active) return active;
+  const enabled = list.filter((a) => a.active && a.address);
+  if (enabled.length) return enabled;
+  if (list.length) return list;
   const cfg = await getConfig(kv);
   if (cfg.depositAddress) {
     const entry: DepositAddress = {
@@ -25,9 +27,22 @@ export async function getActiveDepositAddress(kv: KVNamespace): Promise<DepositA
       createdAt: new Date().toISOString(),
     };
     await saveDepositAddresses(kv, [entry]);
-    return entry;
+    return [entry];
   }
-  return null;
+  return [];
+}
+
+/** Random USDT TRC-20 address from the enabled pool. */
+export async function pickRandomDepositAddress(kv: KVNamespace): Promise<DepositAddress | null> {
+  const pool = await listEnabledDepositAddresses(kv);
+  if (!pool.length) return null;
+  const idx = Math.floor(Math.random() * pool.length);
+  return pool[idx];
+}
+
+/** @deprecated Prefer pickRandomDepositAddress */
+export async function getActiveDepositAddress(kv: KVNamespace): Promise<DepositAddress | null> {
+  return pickRandomDepositAddress(kv);
 }
 
 export async function addDepositAddress(
@@ -37,18 +52,16 @@ export async function addDepositAddress(
   setActive = true
 ): Promise<DepositAddress> {
   const list = await listDepositAddresses(kv);
-  const id = generateId('addr');
   const entry: DepositAddress = {
-    id,
+    id: generateId('addr'),
     network: 'TRC20',
     address: address.trim(),
     label: label?.trim() || 'USDT TRC20',
     active: setActive,
     createdAt: new Date().toISOString(),
   };
-  let next = list.map((a) => (setActive ? { ...a, active: false } : a));
-  next.push(entry);
-  await saveDepositAddresses(kv, next);
+  list.push(entry);
+  await saveDepositAddresses(kv, list);
   return entry;
 }
 
@@ -60,10 +73,7 @@ export async function updateDepositAddress(
   const list = await listDepositAddresses(kv);
   const idx = list.findIndex((a) => a.id === id);
   if (idx < 0) return null;
-  let next = [...list];
-  if (patch.active === true) {
-    next = next.map((a) => ({ ...a, active: a.id === id }));
-  }
+  const next = [...list];
   next[idx] = {
     ...next[idx],
     ...patch,
@@ -78,9 +88,6 @@ export async function removeDepositAddress(kv: KVNamespace, id: string): Promise
   const list = await listDepositAddresses(kv);
   const next = list.filter((a) => a.id !== id);
   if (next.length === list.length) return false;
-  if (list.find((a) => a.id === id)?.active && next.length) {
-    next[0] = { ...next[0], active: true };
-  }
   await saveDepositAddresses(kv, next);
   return true;
 }

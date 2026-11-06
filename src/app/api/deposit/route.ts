@@ -3,11 +3,12 @@ import { getStorage } from '@/lib/memory-kv';
 import {
   ensureSeeded,
   getUser,
-  getActiveDepositAddress,
+  pickRandomDepositAddress,
+  getConfig,
   saveDeposit,
   saveTx,
   saveDepositWatch,
-  getDepositWatchByAddress,
+  listPendingDeposits,
   generateId,
 } from '@/lib/kv';
 import { getUserToken, parseToken } from '@/lib/auth';
@@ -35,24 +36,35 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, message: 'Account banned' }, { status: 403 });
   }
 
-  const addr = await getActiveDepositAddress(kv);
+  const cfg = await getConfig(kv);
+  const minD = Number(cfg.minDepositLimit ?? 1);
+  const maxD = Number(cfg.maxDepositLimit ?? 10000);
+  if (amount < minD) {
+    return NextResponse.json({ ok: false, message: `Minimum deposit is ${minD} USDT` }, { status: 400 });
+  }
+  if (amount > maxD) {
+    return NextResponse.json({ ok: false, message: `Maximum deposit is ${maxD} USDT` }, { status: 400 });
+  }
+
+  const pending = await listPendingDeposits(kv);
+  const mine = pending.find((d) => d.userId === user.id && d.status === 'pending');
+  if (mine) {
+    return NextResponse.json({
+      ok: false,
+      message: 'You already have a pending deposit. Send funds or wait for confirmation.',
+      depositId: mine.id,
+      address: mine.address,
+      network: 'TRC20',
+      amount: mine.amount,
+    });
+  }
+
+  const addr = await pickRandomDepositAddress(kv);
   if (!addr?.address) {
     return NextResponse.json(
       { ok: false, message: 'No USDT TRC-20 deposit address configured. Contact admin.' },
       { status: 400 }
     );
-  }
-
-  const existingWatch = await getDepositWatchByAddress(kv, addr.address);
-  if (existingWatch && existingWatch.status === 'pending' && existingWatch.userId === user.id) {
-    return NextResponse.json({
-      ok: false,
-      message: 'You already have a pending deposit. Send funds or wait for confirmation.',
-      depositId: existingWatch.depositId,
-      address: existingWatch.address,
-      network: 'TRC20',
-      amount: existingWatch.expectedAmount,
-    });
   }
 
   const id = generateId('dep');
@@ -99,6 +111,7 @@ export async function POST(req: Request) {
     network: 'TRC20',
     contract: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
     amount,
-    message: 'Send exact USDT TRC-20 to the address. Balance credits automatically after on-chain confirmation.',
+    message:
+      'Send exact USDT TRC-20 to this address (randomly assigned from admin pool). Balance credits after on-chain confirmation.',
   });
 }
