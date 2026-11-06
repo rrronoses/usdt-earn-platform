@@ -16,7 +16,7 @@ export const memoryKV: KVNamespace = {
   async list(options?: { prefix?: string; limit?: number }) {
     const prefix = options?.prefix ?? '';
     const limit = options?.limit ?? 1000;
-    const keys = [...store.keys()]
+    const keys = Array.from(store.keys())
       .filter((k) => k.startsWith(prefix))
       .slice(0, limit)
       .map((name) => ({ name }));
