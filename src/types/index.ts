@@ -86,6 +86,8 @@ export interface WithdrawalRequest {
 
 export interface SystemConfig {
   minWithdrawalLimit: number;
+  minDepositLimit: number;
+  maxDepositLimit: number;
   depositAddress: string;
   depositNetwork: string;
   depositExpiryMinutes: number;
@@ -112,6 +114,8 @@ export const DEFAULT_PLANS: Plan[] = [
 
 export const DEFAULT_CONFIG: SystemConfig = {
   minWithdrawalLimit: 25,
+  minDepositLimit: 1,
+  maxDepositLimit: 10000,
   depositAddress: 'TXyz1234567890abcdefghijklmnopqrstuv',
   depositNetwork: 'TRC20',
   depositExpiryMinutes: 30,
