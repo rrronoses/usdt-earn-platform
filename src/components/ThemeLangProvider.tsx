@@ -48,12 +48,15 @@ const dict = {
   },
 } as const;
 
+type TranslationKey = keyof (typeof dict)['en'];
+type Translations = Record<TranslationKey, string>;
+
 type Ctx = {
   theme: Theme;
   lang: Lang;
   setTheme: (t: Theme) => void;
   setLang: (l: Lang) => void;
-  t: (typeof dict)['en'];
+  t: Translations;
 };
 
 const ThemeLangContext = createContext<Ctx | null>(null);
@@ -86,7 +89,7 @@ export function ThemeLangProvider({ children }: { children: React.ReactNode }) {
   };
 
   const value = useMemo(
-    () => ({ theme, lang, setTheme, setLang, t: dict[lang] }),
+    () => ({ theme, lang, setTheme, setLang, t: dict[lang] as Translations }),
     [theme, lang]
   );
 
