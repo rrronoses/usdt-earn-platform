@@ -33,7 +33,11 @@ export async function POST() {
       return { ...p, status: 'expired' as const };
     }
     total += p.dailyYield;
-    return { ...p, lastClaimedAt: now, claimedDays: p.claimedDays + 1 };
+    return {
+      ...p,
+      lastClaimedAt: now,
+      claimedDays: p.claimedDays + 1,
+    };
   });
 
   if (total <= 0) {
@@ -61,5 +65,9 @@ export async function POST() {
   analytics.totalYieldPaid = Number((analytics.totalYieldPaid + total).toFixed(6));
   await saveAnalytics(kv, analytics);
 
-  return NextResponse.json({ ok: true, claimed: total, withdrawalBalance: user.withdrawalBalance });
+  return NextResponse.json({
+    ok: true,
+    claimed: total,
+    withdrawalBalance: user.withdrawalBalance,
+  });
 }
