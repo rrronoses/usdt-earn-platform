@@ -20,6 +20,7 @@ export default function PlansPage() {
   const router = useRouter();
   const { t } = useThemeLang();
   const [plans, setPlans] = useState<Plan[]>([]);
+  const [owned, setOwned] = useState<any[]>([]);
   const [msg, setMsg] = useState('');
   const [loading, setLoading] = useState<string | null>(null);
   const [depositBalance, setDepositBalance] = useState(0);
@@ -34,6 +35,11 @@ export default function PlansPage() {
         }
         setDepositBalance(d.user.depositBalance);
         setPlans((d.catalog || []).filter((p: Plan) => p.active));
+        setOwned(
+          (d.plans || []).filter(
+            (p: any) => p.status === 'active' && new Date(p.expiryDate) > new Date()
+          )
+        );
       });
   }
 
@@ -51,7 +57,7 @@ export default function PlansPage() {
         body: JSON.stringify({ planId }),
       });
       const d: any = await res.json();
-      setMsg(d.message || (d.ok ? 'Purchased successfully!' : 'Failed'));
+      setMsg(d.message || (d.ok ? 'Plan purchased! Claim combines all active plans.' : 'Failed'));
       if (d.ok) load();
     } catch {
       setMsg('Network error');
@@ -59,27 +65,40 @@ export default function PlansPage() {
     setLoading(null);
   }
 
+  const dailyFromOwned = owned.reduce((s, p) => s + (Number(p.dailyYield) || 0), 0);
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 pb-24 relative">
+    <div className="min-h-screen bg-slate-950 text-slate-100 pb-28 relative">
       <div className="fixed inset-0 pointer-events-none">
-        <div className="absolute top-0 right-0 w-72 h-72 bg-emerald-500/10 blur-[100px] rounded-full" />
+        <div className="absolute top-0 right-0 w-80 h-80 bg-emerald-500/15 blur-[110px] rounded-full" />
+        <div className="absolute bottom-32 left-0 w-56 h-56 bg-teal-500/10 blur-[80px] rounded-full" />
       </div>
       <UserNav />
       <main className="max-w-lg mx-auto px-4 py-5 space-y-4 relative z-10">
-        <div className="flex items-center justify-between">
+        <div className="flex items-start justify-between gap-3">
           <div>
-            <h1 className="text-xl font-extrabold">{t.plans}</h1>
-            <p className="text-xs text-slate-500 mt-0.5">Pay from deposit balance</p>
+            <h1 className="text-2xl font-black tracking-tight">{t.plans}</h1>
+            <p className="text-xs text-slate-500 mt-1">Stack plans — claim adds all daily yields</p>
           </div>
-          <div className="text-right rounded-xl bg-emerald-500/10 border border-emerald-500/30 px-3 py-2">
-            <p className="text-[10px] text-slate-400 uppercase">Deposit</p>
-            <p className="font-bold text-emerald-400">{depositBalance.toFixed(2)} USDT</p>
+          <div className="text-right rounded-2xl bg-emerald-500/10 border border-emerald-500/30 px-3.5 py-2.5">
+            <p className="text-[10px] text-slate-400 uppercase tracking-wide">Deposit</p>
+            <p className="font-black text-emerald-400 text-lg leading-tight">{depositBalance.toFixed(2)}</p>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-3.5 text-sm text-slate-300">
-          Higher tiers = more daily claims. Paid buys pay <strong className="text-emerald-300">20%</strong> to your
-          referrer.
+        {owned.length > 0 && (
+          <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-sm">
+            <p className="text-slate-300">
+              You have <strong className="text-white">{owned.length}</strong> active plan
+              {owned.length > 1 ? 's' : ''} · daily claim{' '}
+              <strong className="text-emerald-300">{dailyFromOwned.toFixed(2)} USDT</strong>
+            </p>
+          </div>
+        )}
+
+        <div className="rounded-2xl border border-white/5 bg-slate-900/50 p-3.5 text-sm text-slate-300 leading-relaxed">
+          Buy with deposit balance. If you own <strong className="text-white">two plans</strong>, one
+          claim pays <strong className="text-emerald-300">both</strong> daily amounts.
         </div>
 
         {msg && (
@@ -91,75 +110,78 @@ export default function PlansPage() {
         {plans.map((p) => {
           const total = p.dailyYield * p.durationDays;
           const isBronze = p.isOneTime || p.id === 'bronze';
+          const hasActive = owned.some((o) => o.planId === p.id);
           const featured =
-            p.badge === 'Best value' ||
-            p.name.toLowerCase().includes('platinum') ||
-            p.price === 25 ||
-            p.price === 60;
+            p.price === 25 || p.price === 60 || (p.badge && p.badge.length > 0);
+          const canAfford = depositBalance >= p.price;
 
           return (
             <div
               key={p.id}
-              className={`rounded-3xl border p-5 transition ${
+              className={`rounded-[1.35rem] border p-5 transition ${
                 featured
-                  ? 'border-emerald-500/40 bg-gradient-to-b from-emerald-500/10 to-slate-900/90 shadow-lg shadow-emerald-500/10'
-                  : 'border-white/5 bg-slate-900/60'
+                  ? 'border-emerald-400/45 bg-gradient-to-b from-emerald-500/15 via-slate-900/90 to-slate-950 shadow-xl shadow-emerald-500/15'
+                  : 'border-white/5 bg-slate-900/70'
               }`}
             >
               <div className="flex justify-between items-start gap-3">
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h2 className="font-bold text-lg">{p.name}</h2>
-                    {p.badge && (
-                      <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full bg-emerald-500 text-slate-950 font-bold">
-                        {p.badge}
+                    <h2 className="font-bold text-xl">{p.name}</h2>
+                    {featured && (
+                      <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full bg-emerald-500 text-slate-950 font-extrabold">
+                        {p.badge || (p.price === 60 ? 'Best value' : 'Popular')}
                       </span>
                     )}
-                    {featured && !p.badge && (
-                      <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold">
-                        Recommended
+                    {hasActive && (
+                      <span className="text-[10px] uppercase px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/30 font-bold">
+                        Owned
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    {isBronze ? 'Signup-only · not rebuyable' : 'Rebuy after expiration'}
+                  <p className="text-xs text-slate-500 mt-1">
+                    {isBronze ? 'Free on signup · one-time' : 'Rebuy after this plan expires'}
                   </p>
                 </div>
-                <p className="text-2xl font-black text-emerald-400 shrink-0">
-                  {p.price}
-                  <span className="text-sm text-slate-400 font-semibold"> USDT</span>
-                </p>
+                <div className="text-right shrink-0">
+                  <p className="text-3xl font-black text-emerald-400 leading-none">{p.price}</p>
+                  <p className="text-xs text-slate-400 font-semibold mt-0.5">USDT</p>
+                </div>
               </div>
 
               <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-                <div className="rounded-xl bg-black/30 border border-white/5 py-2.5 px-1">
+                <div className="rounded-xl bg-black/35 border border-white/5 py-2.5">
                   <p className="text-[10px] text-slate-500 uppercase">Days</p>
-                  <p className="font-bold">{p.durationDays}</p>
+                  <p className="font-bold text-lg">{p.durationDays}</p>
                 </div>
-                <div className="rounded-xl bg-black/30 border border-white/5 py-2.5 px-1">
-                  <p className="text-[10px] text-slate-500 uppercase">Daily</p>
-                  <p className="font-bold text-emerald-300">{p.dailyYield}</p>
+                <div className="rounded-xl bg-black/35 border border-white/5 py-2.5">
+                  <p className="text-[10px] text-slate-500 uppercase">Daily claim</p>
+                  <p className="font-bold text-lg text-emerald-300">{p.dailyYield}</p>
                 </div>
-                <div className="rounded-xl bg-black/30 border border-white/5 py-2.5 px-1">
+                <div className="rounded-xl bg-black/35 border border-white/5 py-2.5">
                   <p className="text-[10px] text-slate-500 uppercase">Max yield</p>
-                  <p className="font-bold">{total}</p>
+                  <p className="font-bold text-lg">{total}</p>
                 </div>
               </div>
 
               <button
                 onClick={() => buy(p.id)}
-                disabled={isBronze || loading === p.id}
-                className={`mt-4 w-full py-3 rounded-xl font-bold transition disabled:opacity-40 ${
-                  featured
-                    ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 shadow-lg shadow-emerald-500/25'
+                disabled={isBronze || hasActive || loading === p.id || (!canAfford && !isBronze)}
+                className={`mt-4 w-full py-3.5 rounded-xl font-extrabold transition disabled:opacity-40 active:scale-[0.98] ${
+                  featured && !isBronze && !hasActive
+                    ? 'bg-gradient-to-r from-emerald-400 to-teal-500 text-slate-950 shadow-lg shadow-emerald-500/30'
                     : 'bg-emerald-500 text-slate-950 hover:bg-emerald-400'
                 }`}
               >
                 {isBronze
                   ? 'Included on signup'
-                  : loading === p.id
-                    ? 'Processing…'
-                    : `Buy ${p.name} · ${p.price} USDT`}
+                  : hasActive
+                    ? 'Already active'
+                    : loading === p.id
+                      ? 'Processing…'
+                      : !canAfford
+                        ? `Need ${p.price} USDT deposit`
+                        : `Buy ${p.name} · ${p.price} USDT`}
               </button>
             </div>
           );
@@ -167,6 +189,19 @@ export default function PlansPage() {
 
         {plans.length === 0 && (
           <p className="text-slate-500 text-center py-16">Loading plans…</p>
+        )}
+
+        {depositBalance < 10 && (
+          <div className="rounded-2xl border border-white/5 bg-slate-900/50 p-4 text-center text-sm text-slate-400">
+            Low deposit?{' '}
+            <button
+              type="button"
+              onClick={() => router.push('/dashboard')}
+              className="text-emerald-400 font-semibold"
+            >
+              Deposit USDT on dashboard
+            </button>
+          </div>
         )}
       </main>
     </div>
