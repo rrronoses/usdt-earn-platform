@@ -25,7 +25,7 @@ export async function POST(req: Request) {
   if (!requireAdmin()) return NextResponse.json({ ok: false, message: 'Unauthorized' }, { status: 401 });
   const kv = getStorage();
   await ensureSeeded(kv);
-  const body = await req.json().catch(() => ({}));
+  const body: any = await req.json().catch(() => ({}));
   const cfg = await getConfig(kv);
   if (body.minWithdrawalLimit !== undefined) cfg.minWithdrawalLimit = Math.max(0, Number(body.minWithdrawalLimit));
   if (body.minDepositLimit !== undefined) cfg.minDepositLimit = Math.max(0, Number(body.minDepositLimit));

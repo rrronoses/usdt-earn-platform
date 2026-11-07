@@ -22,7 +22,7 @@ export async function POST(req: Request) {
   const parsed = parseToken(token);
   if (!parsed) return NextResponse.json({ ok: false, message: 'Unauthorized' }, { status: 401 });
 
-  const body = await req.json().catch(() => ({}));
+  const body: any = await req.json().catch(() => ({}));
   const amount = Number(body.amount);
   if (!amount || amount <= 0) {
     return NextResponse.json({ ok: false, message: 'Invalid amount' }, { status: 400 });

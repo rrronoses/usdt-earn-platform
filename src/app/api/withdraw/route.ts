@@ -14,7 +14,7 @@ export async function POST(req: Request) {
   const parsed = parseToken(token);
   if (!parsed) return NextResponse.json({ ok: false, message: 'Unauthorized' }, { status: 401 });
 
-  const body = await req.json().catch(() => ({}));
+  const body: any = await req.json().catch(() => ({}));
   const amount = Number(body.amount);
   const destinationAddress = String(body.address || body.destinationAddress || '').trim();
 

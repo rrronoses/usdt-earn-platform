@@ -10,7 +10,7 @@ export async function POST(req: Request) {
   const kv = getStorage();
   await ensureSeeded(kv);
 
-  const body = await req.json().catch(() => ({}));
+  const body: any = await req.json().catch(() => ({}));
   const cronSecret = process.env.CRON_SECRET;
   const headerSecret = req.headers.get('x-cron-secret');
   const isCron = Boolean(cronSecret && headerSecret && headerSecret === cronSecret);
