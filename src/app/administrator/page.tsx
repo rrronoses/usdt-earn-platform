@@ -17,7 +17,7 @@ export default function AdminLoginPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password, asAdmin: true }),
     });
-    const data = await res.json();
+    const data: any = await res.json();
     if (!data.ok) {
       setError(data.message || 'Invalid credentials');
       return;

@@ -15,7 +15,7 @@ export default function AdminDepositsPage() {
   const [editLabel, setEditLabel] = useState('');
 
   async function load() {
-    const d = await fetch('/api/admin/deposit-addresses').then((r) => r.json());
+    const d: any = await fetch('/api/admin/deposit-addresses').then((r) => r.json());
     if (d.ok) setAddresses(d.addresses || []);
     else setMsg(d.message || 'Login as admin');
   }
@@ -25,7 +25,7 @@ export default function AdminDepositsPage() {
   }, []);
 
   async function api(body: Record<string, unknown>) {
-    const d = await fetch('/api/admin/deposit-addresses', {
+    const d: any = await fetch('/api/admin/deposit-addresses', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),

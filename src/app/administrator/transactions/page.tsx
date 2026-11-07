@@ -13,7 +13,7 @@ export default function AdminTxPage() {
     if (type) q.set('type', type);
     if (status) q.set('status', status);
     if (userId) q.set('userId', userId);
-    const d = await fetch(`/api/admin/transactions?${q}`).then((r) => r.json());
+    const d: any = await fetch(`/api/admin/transactions?${q}`).then((r) => r.json());
     if (d.ok) setTxs(d.transactions || []);
   }
   useEffect(() => { load(); }, []);

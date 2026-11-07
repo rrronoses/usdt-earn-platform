@@ -11,14 +11,14 @@ export default function AdminPlansPage() {
   const [msg, setMsg] = useState('');
 
   async function load() {
-    const d = await fetch('/api/admin/plans').then((r) => r.json());
+    const d: any = await fetch('/api/admin/plans').then((r) => r.json());
     if (d.ok) setPlans(d.plans || []);
   }
   useEffect(() => { load(); }, []);
 
   async function save() {
     const action = editing ? 'update' : 'add';
-    const d = await fetch('/api/admin/plans', {
+    const d: any = await fetch('/api/admin/plans', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action, plan: form }),
@@ -29,7 +29,7 @@ export default function AdminPlansPage() {
 
   async function remove(id: string) {
     if (!confirm('Remove plan?')) return;
-    const d = await fetch('/api/admin/plans', {
+    const d: any = await fetch('/api/admin/plans', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'remove', id }),

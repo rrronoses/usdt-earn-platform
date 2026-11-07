@@ -7,13 +7,13 @@ export default function AdminWithdrawalsPage() {
   const [msg, setMsg] = useState('');
 
   async function load() {
-    const d = await fetch('/api/admin/withdrawals').then((r) => r.json());
+    const d: any = await fetch('/api/admin/withdrawals').then((r) => r.json());
     if (d.ok) setList(d.withdrawals || []);
   }
   useEffect(() => { load(); }, []);
 
   async function act(id: string, action: 'approve' | 'reject') {
-    const d = await fetch('/api/admin/withdrawals', {
+    const d: any = await fetch('/api/admin/withdrawals', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, action }),

@@ -24,7 +24,7 @@ function SignupForm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, email, password, referralCode: referralCode || undefined }),
       });
-      const data = await res.json();
+      const data: any = await res.json();
       if (!data.ok) {
         setError(data.message || 'Signup failed');
         setLoading(false);

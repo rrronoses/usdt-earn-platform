@@ -17,19 +17,19 @@ export default function AdminUsersPage() {
   const [msg, setMsg] = useState('');
 
   async function load() {
-    const d = await fetch(`/api/admin/users?filter=${filter}`).then((r) => r.json());
+    const d: any = await fetch(`/api/admin/users?filter=${filter}`).then((r) => r.json());
     if (d.ok) setUsers(d.users || []);
     else setMsg(d.message || 'Error');
   }
   useEffect(() => { load(); }, [filter]);
 
   async function openUser(id: string) {
-    const d = await fetch(`/api/admin/users?userId=${id}&txType=${txType}`).then((r) => r.json());
+    const d: any = await fetch(`/api/admin/users?userId=${id}&txType=${txType}`).then((r) => r.json());
     if (d.ok) setDetail(d);
   }
 
   async function act(action: string, userId: string, extra: Record<string, unknown> = {}) {
-    const d = await fetch('/api/admin/users', {
+    const d: any = await fetch('/api/admin/users', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action, userId, ...extra }),
