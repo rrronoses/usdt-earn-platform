@@ -11,7 +11,7 @@ export const runtime = 'edge';
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    const body: any = await req.json();
     const username = String(body.username || '').trim();
     const email = String(body.email || '').trim().toLowerCase();
     const password = String(body.password || '');

@@ -55,7 +55,7 @@ export async function POST(req: Request) {
   if (!requireAdmin()) return NextResponse.json({ ok: false, message: 'Unauthorized' }, { status: 401 });
   const kv = getStorage();
   await ensureSeeded(kv);
-  const body = await req.json().catch(() => ({}));
+  const body: any = await req.json().catch(() => ({}));
   const action = String(body.action || '');
   const userId = String(body.userId || '');
   if (!userId) return NextResponse.json({ ok: false, message: 'userId required' }, { status: 400 });
