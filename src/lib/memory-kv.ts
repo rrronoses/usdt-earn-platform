@@ -24,8 +24,46 @@ export const memoryKV: KVNamespace = {
   },
 };
 
+/**
+ * Resolve Cloudflare KV binding `USDTSTORAGE`.
+ * On Pages + next-on-pages the binding is on getRequestContext().env
+ */
 export function getStorage(): KVNamespace {
-  const g = globalThis as unknown as { USDTSTORAGE?: KVNamespace };
+  // 1) Official next-on-pages request context (production)
+  try {
+    // Dynamic require-style access so local builds without the package still typecheck
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getRequestContext } = require('@cloudflare/next-on-pages') as {
+      getRequestContext: () => { env: { USDTSTORAGE?: KVNamespace } };
+    };
+    const ctx = getRequestContext();
+    if (ctx?.env?.USDTSTORAGE) return ctx.env.USDTSTORAGE;
+  } catch {
+    // Not in a Pages request, or package unavailable locally
+  }
+
+  // 2) globalThis / env injected by runtime
+  const g = globalThis as unknown as {
+    USDTSTORAGE?: KVNamespace;
+    env?: { USDTSTORAGE?: KVNamespace };
+  };
   if (g.USDTSTORAGE) return g.USDTSTORAGE;
+  if (g.env?.USDTSTORAGE) return g.env.USDTSTORAGE;
+
+  // 3) Local dev fallback (does NOT persist across deploys / cold starts)
   return memoryKV;
+}
+
+export function isUsingRealKV(): boolean {
+  try {
+    const { getRequestContext } = require('@cloudflare/next-on-pages') as {
+      getRequestContext: () => { env: { USDTSTORAGE?: KVNamespace } };
+    };
+    const ctx = getRequestContext();
+    if (ctx?.env?.USDTSTORAGE) return true;
+  } catch {
+    /* ignore */
+  }
+  const g = globalThis as unknown as { USDTSTORAGE?: KVNamespace; env?: { USDTSTORAGE?: KVNamespace } };
+  return !!(g.USDTSTORAGE || g.env?.USDTSTORAGE);
 }
