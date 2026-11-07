@@ -13,13 +13,13 @@ export default function AdminSettingsPage() {
   const [msg, setMsg] = useState('');
 
   useEffect(() => {
-    fetch('/api/admin/settings').then((r) => r.json()).then((d) => {
+    fetch('/api/admin/settings').then((r) => r.json()).then((d: any) => {
       if (d.ok && d.config) setCfg((c) => ({ ...c, ...d.config }));
     });
   }, []);
 
   async function save() {
-    const d = await fetch('/api/admin/settings', {
+    const d: any = await fetch('/api/admin/settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(cfg),

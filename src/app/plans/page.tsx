@@ -24,7 +24,7 @@ export default function PlansPage() {
   useEffect(() => {
     fetch('/api/me')
       .then((r) => r.json())
-      .then((d) => {
+      .then((d: any) => {
         if (!d.ok) {
           router.push('/login');
           return;

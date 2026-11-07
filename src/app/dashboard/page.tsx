@@ -14,7 +14,7 @@ export default function DashboardPage() {
   const timerRef = useRef<any>(null);
 
   const loadMe = useCallback(() => {
-    return fetch('/api/me').then((r) => r.json()).then((d) => {
+    return fetch('/api/me').then((r) => r.json()).then((d: any) => {
       if (!d.ok) { router.push('/login'); return null; }
       setData(d); return d;
     }).catch(() => null);
@@ -37,7 +37,7 @@ export default function DashboardPage() {
     timerRef.current = setInterval(() => setSecondsLeft((s) => (s <= 1 ? (stopPolling(), 0) : s - 1)), 1000);
     pollRef.current = setInterval(async () => {
       try {
-        const d = await fetch(`/api/deposit/check-status?depositId=${encodeURIComponent(depositId)}`).then((r) => r.json());
+        const d: any = await fetch(`/api/deposit/check-status?depositId=${encodeURIComponent(depositId)}`).then((r) => r.json());
         if (d.ok && (d.credited || d.status === 'approved' || d.status === 'completed')) {
           stopPolling();
           setMsg(`Deposit confirmed! +${Number(d.creditedAmount || 0).toFixed(2)} USDT`);
@@ -51,7 +51,7 @@ export default function DashboardPage() {
   async function startDeposit() {
     const amount = parseFloat(depAmount);
     if (!amount || amount <= 0) { setMsg('Enter valid amount'); return; }
-    const d = await fetch('/api/deposit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount }) }).then((r) => r.json());
+    const d: any = await fetch('/api/deposit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount }) }).then((r) => r.json());
     if (!d.ok) {
       setMsg(d.message || 'Failed');
       if (d.depositId && d.address) { setDepInfo({ address: d.address, amount: d.amount || amount, depositId: d.depositId }); startPolling(d.depositId); }
@@ -63,7 +63,7 @@ export default function DashboardPage() {
   }
 
   async function claim() {
-    const d = await fetch('/api/claim', { method: 'POST' }).then((r) => r.json());
+    const d: any = await fetch('/api/claim', { method: 'POST' }).then((r) => r.json());
     setMsg(d.message || (d.ok ? `Claimed ${d.claimed} USDT` : 'Claim failed'));
     if (d.ok) loadMe();
   }
@@ -115,7 +115,7 @@ export default function DashboardPage() {
               </div>
               {secondsLeft > 0 && <p className="text-center font-mono text-amber-400 text-lg">{mm}:{ss}</p>}
               <button type="button" onClick={async () => {
-                const d = await fetch('/api/deposit/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ depositId: depInfo.depositId }) }).then((r) => r.json());
+                const d: any = await fetch('/api/deposit/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ depositId: depInfo.depositId }) }).then((r) => r.json());
                 if (d.credited) { stopPolling(); setMsg(`Credited ${d.amount} USDT`); setDepInfo(null); loadMe(); }
                 else setMsg(d.reason || 'Not confirmed yet');
               }} className="w-full py-2 rounded-lg bg-slate-700 text-sm">Check chain now</button>
