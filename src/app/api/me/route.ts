@@ -19,7 +19,7 @@ export async function GET() {
   const plans = await getUserPlans(kv, user.id);
   const transactions = await getUserTransactions(kv, user.id, 100);
   const config = await getConfig(kv);
-  const catalog = = await listPlans(kv);
+  const catalog = await listPlans(kv);
 
   return NextResponse.json({
     ok: true,
