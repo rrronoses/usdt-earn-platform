@@ -1,3 +1,4 @@
+import { getRequestContext } from '@cloudflare/next-on-pages';
 import type { KVNamespace } from './kv';
 
 /** In-memory KV for local `next dev` when USDTSTORAGE is not bound */
@@ -24,38 +25,24 @@ export const memoryKV: KVNamespace = {
   },
 };
 
-function readFromRequestContext(): KVNamespace | null {
+function fromPagesEnv(): KVNamespace | null {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const mod = require('@cloudflare/next-on-pages') as {
-      getRequestContext?: () => { env?: { USDTSTORAGE?: KVNamespace } };
-    };
-    const ctx = mod.getRequestContext?.();
-    if (ctx?.env?.USDTSTORAGE) return ctx.env.USDTSTORAGE;
+    const { env } = getRequestContext() as { env?: { USDTSTORAGE?: KVNamespace } };
+    if (env?.USDTSTORAGE) return env.USDTSTORAGE;
   } catch {
-    /* offline / local */
+    // Not inside a Cloudflare request (e.g. local next dev)
   }
-
-  // Fallback: some runtimes attach env on globalThis
-  try {
-    // @ts-expect-error optional cloudflare global
-    const cf = globalThis[Symbol.for('cloudflare:request-context')];
-    if (cf?.env?.USDTSTORAGE) return cf.env.USDTSTORAGE as KVNamespace;
-  } catch {
-    /* ignore */
-  }
-
   return null;
 }
 
 /**
  * Resolve Cloudflare KV binding `USDTSTORAGE`.
- * Production (Pages + next-on-pages): real KV
- * Local next dev: memory fallback
+ * Production (Pages + next-on-pages): real KV namespace
+ * Local next dev: in-memory fallback (does not persist)
  */
 export function getStorage(): KVNamespace {
-  const fromCtx = readFromRequestContext();
-  if (fromCtx) return fromCtx;
+  const bound = fromPagesEnv();
+  if (bound) return bound;
 
   const g = globalThis as unknown as {
     USDTSTORAGE?: KVNamespace;
@@ -68,7 +55,7 @@ export function getStorage(): KVNamespace {
 }
 
 export function isUsingRealKV(): boolean {
-  if (readFromRequestContext()) return true;
+  if (fromPagesEnv()) return true;
   const g = globalThis as unknown as { USDTSTORAGE?: KVNamespace; env?: { USDTSTORAGE?: KVNamespace } };
   return !!(g.USDTSTORAGE || g.env?.USDTSTORAGE);
 }
