@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 
 export default function AdminLoginPage() {
   const router = useRouter();
-  const [username, setUsername] = useState('admin');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -60,6 +60,7 @@ export default function AdminLoginPage() {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               className="input-field"
+              placeholder="Username"
               autoComplete="username"
             />
           </div>
@@ -79,8 +80,7 @@ export default function AdminLoginPage() {
           </button>
         </form>
 
-        <p className="text-center text-xs text-slate-600 mt-5">Default: admin / admin123</p>
-        <p className="text-center mt-3">
+        <p className="text-center mt-5">
           <Link href="/" className="text-slate-500 text-sm hover:text-emerald-400 transition">
             ← Back to site
           </Link>
