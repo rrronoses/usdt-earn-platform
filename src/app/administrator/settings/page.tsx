@@ -1,6 +1,7 @@
 'use client';
+
 import { useEffect, useState } from 'react';
-import { AdminNav } from '@/components/AdminNav';
+import { AdminShell } from '@/components/AdminNav';
 
 export default function AdminSettingsPage() {
   const [cfg, setCfg] = useState({
@@ -11,45 +12,66 @@ export default function AdminSettingsPage() {
     withdrawalNote: '',
   });
   const [msg, setMsg] = useState('');
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    fetch('/api/admin/settings').then((r) => r.json()).then((d: any) => {
-      if (d.ok && d.config) setCfg((c) => ({ ...c, ...d.config }));
-    });
+    fetch('/api/admin/settings')
+      .then((r) => r.json())
+      .then((d: any) => {
+        if (d.ok && d.config) setCfg((c) => ({ ...c, ...d.config }));
+      });
   }, []);
 
   async function save() {
+    setSaving(true);
     const d: any = await fetch('/api/admin/settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(cfg),
     }).then((r) => r.json());
-    setMsg(d.ok ? 'Settings saved' : (d.message || 'Failed'));
+    setMsg(d.ok ? 'Settings saved successfully' : d.message || 'Failed');
+    setSaving(false);
   }
 
+  const fields: { key: keyof typeof cfg; label: string; type?: string }[] = [
+    { key: 'minWithdrawalLimit', label: 'Min withdrawal (USDT)' },
+    { key: 'minDepositLimit', label: 'Min deposit (USDT)' },
+    { key: 'maxDepositLimit', label: 'Max deposit (USDT)' },
+    { key: 'depositExpiryMinutes', label: 'Deposit expiry (minutes)' },
+  ];
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      <AdminNav />
-      <main className="max-w-lg mx-auto px-4 py-6 space-y-4">
-        <h1 className="text-xl font-bold">Platform settings</h1>
-        {msg && <p className="text-sm text-emerald-400">{msg}</p>}
-        <label className="block text-sm">Min withdrawal (USDT)
-          <input type="number" value={cfg.minWithdrawalLimit} onChange={(e) => setCfg({ ...cfg, minWithdrawalLimit: Number(e.target.value) })} className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700" />
+    <AdminShell title="Settings" subtitle="Platform limits and user-facing notes">
+      {msg && (
+        <div className="mb-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-300 text-sm">
+          {msg}
+        </div>
+      )}
+
+      <div className="max-w-lg space-y-4 rounded-2xl border border-white/10 bg-slate-900/50 p-5 sm:p-6">
+        {fields.map((f) => (
+          <label key={f.key} className="block">
+            <span className="text-xs font-medium uppercase tracking-wide text-slate-400">{f.label}</span>
+            <input
+              type="number"
+              value={cfg[f.key] as number}
+              onChange={(e) => setCfg({ ...cfg, [f.key]: Number(e.target.value) })}
+              className="input-field mt-1.5"
+            />
+          </label>
+        ))}
+        <label className="block">
+          <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Withdrawal note</span>
+          <textarea
+            value={cfg.withdrawalNote}
+            onChange={(e) => setCfg({ ...cfg, withdrawalNote: e.target.value })}
+            className="input-field mt-1.5 min-h-[100px] resize-y"
+          />
         </label>
-        <label className="block text-sm">Min deposit (USDT)
-          <input type="number" value={cfg.minDepositLimit} onChange={(e) => setCfg({ ...cfg, minDepositLimit: Number(e.target.value) })} className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700" />
-        </label>
-        <label className="block text-sm">Max deposit (USDT)
-          <input type="number" value={cfg.maxDepositLimit} onChange={(e) => setCfg({ ...cfg, maxDepositLimit: Number(e.target.value) })} className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700" />
-        </label>
-        <label className="block text-sm">Deposit expiry (minutes)
-          <input type="number" value={cfg.depositExpiryMinutes} onChange={(e) => setCfg({ ...cfg, depositExpiryMinutes: Number(e.target.value) })} className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700" />
-        </label>
-        <label className="block text-sm">Withdrawal note
-          <textarea value={cfg.withdrawalNote} onChange={(e) => setCfg({ ...cfg, withdrawalNote: e.target.value })} className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 min-h-[80px]" />
-        </label>
-        <button onClick={save} className="w-full py-2.5 rounded-xl bg-emerald-600 font-bold">Save settings</button>
-      </main>
-    </div>
+        <button onClick={save} disabled={saving} className="btn-primary w-full py-3.5">
+          {saving ? 'Saving…' : 'Save settings'}
+        </button>
+      </div>
+    </AdminShell>
   );
 }

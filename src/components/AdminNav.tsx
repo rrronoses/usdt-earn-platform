@@ -1,57 +1,103 @@
 'use client';
+
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { ThemeLangToggles } from './ThemeLangProvider';
 
 const links = [
-  { href: '/administrator/dashboard', label: 'Dashboard' },
-  { href: '/administrator/users', label: 'Users' },
-  { href: '/administrator/withdrawals', label: 'Withdrawals' },
-  { href: '/administrator/transactions', label: 'Transactions' },
-  { href: '/administrator/plans', label: 'Plans' },
-  { href: '/administrator/deposits', label: 'Deposits' },
-  { href: '/administrator/settings', label: 'Settings' },
+  { href: '/administrator/dashboard', label: 'Overview', icon: '▣' },
+  { href: '/administrator/users', label: 'Users', icon: '◎' },
+  { href: '/administrator/withdrawals', label: 'Withdrawals', icon: '↓' },
+  { href: '/administrator/transactions', label: 'Transactions', icon: '⇄' },
+  { href: '/administrator/plans', label: 'Plans', icon: '◈' },
+  { href: '/administrator/deposits', label: 'Deposits', icon: '₮' },
+  { href: '/administrator/settings', label: 'Settings', icon: '⚙' },
 ];
 
 export function AdminNav() {
   const path = usePathname();
   const router = useRouter();
+
   return (
-    <header className="border-b border-white/5 bg-slate-950/95 backdrop-blur sticky top-0 z-40">
-      <div className="max-w-6xl mx-auto px-3 py-2.5 flex flex-wrap items-center gap-2 justify-between">
-        <div className="flex items-center gap-2 mr-2">
-          <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center text-white text-xs font-bold">₮</span>
-          <span className="font-bold text-sm hidden sm:inline">USDT<span className="text-emerald-400">Earn</span> Admin</span>
-        </div>
-        <div className="flex flex-wrap gap-1 text-xs sm:text-sm flex-1">
-          {links.map((l) => (
-            <Link
-              key={l.href}
-              href={l.href}
-              className={`px-2.5 py-1.5 rounded-lg transition ${
-                path === l.href
-                  ? 'bg-emerald-500 text-slate-950 font-semibold'
-                  : 'text-slate-300 hover:bg-slate-800'
-              }`}
+    <header className="sticky top-0 z-50 border-b border-white/5 bg-slate-950/90 backdrop-blur-xl">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4">
+        <div className="h-14 flex items-center justify-between gap-3">
+          <Link href="/administrator/dashboard" className="flex items-center gap-2.5 shrink-0 group">
+            <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-emerald-500 flex items-center justify-center text-white text-sm font-black shadow-lg shadow-violet-500/20 group-hover:scale-105 transition">
+              A
+            </span>
+            <div className="hidden sm:block leading-tight">
+              <p className="font-bold text-sm tracking-tight">
+                USDT<span className="text-emerald-400">Earn</span>
+              </p>
+              <p className="text-[10px] text-slate-500 uppercase tracking-widest">Admin Console</p>
+            </div>
+          </Link>
+
+          <div className="flex items-center gap-2">
+            <ThemeLangToggles />
+            <button
+              type="button"
+              className="text-xs font-medium text-red-400/90 px-2.5 py-1.5 rounded-lg hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition"
+              onClick={async () => {
+                await fetch('/api/auth/logout', { method: 'POST' });
+                router.push('/administrator');
+              }}
             >
-              {l.label}
-            </Link>
-          ))}
+              Logout
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <ThemeLangToggles />
-          <button
-            type="button"
-            className="text-xs text-red-400 px-2 py-1 hover:bg-red-500/10 rounded-lg"
-            onClick={async () => {
-              await fetch('/api/auth/logout', { method: 'POST' });
-              router.push('/administrator');
-            }}
-          >
-            Logout
-          </button>
-        </div>
+
+        <nav className="flex gap-1 overflow-x-auto pb-2.5 -mx-1 px-1 scrollbar-thin">
+          {links.map((l) => {
+            const active = path === l.href || path.startsWith(l.href + '/');
+            return (
+              <Link
+                key={l.href}
+                href={l.href}
+                className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition ${
+                  active
+                    ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 shadow-md shadow-emerald-500/20'
+                    : 'text-slate-400 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                <span className="opacity-80">{l.icon}</span>
+                {l.label}
+              </Link>
+            );
+          })}
+        </nav>
       </div>
     </header>
+  );
+}
+
+export function AdminShell({
+  title,
+  subtitle,
+  children,
+  actions,
+}: {
+  title: string;
+  subtitle?: string;
+  children: React.ReactNode;
+  actions?: React.ReactNode;
+}) {
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-100 relative">
+      <div className="fixed inset-0 pointer-events-none mesh-bg opacity-80" />
+      <AdminNav />
+      <main className="relative z-10 max-w-7xl mx-auto px-3 sm:px-4 py-6 sm:py-8">
+        <div className="flex flex-wrap items-end justify-between gap-3 mb-6">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight">{title}</h1>
+            {subtitle && <p className="text-sm text-slate-400 mt-1">{subtitle}</p>}
+          </div>
+          {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
+        </div>
+        {children}
+      </main>
+    </div>
   );
 }
