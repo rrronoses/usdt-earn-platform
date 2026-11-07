@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { UserNav } from '@/components/UserNav';
 
 export default function InvitationPage() {
   const router = useRouter();
@@ -10,8 +10,10 @@ export default function InvitationPage() {
   const [earnings, setEarnings] = useState(0);
   const [referrals, setReferrals] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
+  const [origin, setOrigin] = useState('');
 
   useEffect(() => {
+    setOrigin(window.location.origin);
     fetch('/api/me')
       .then((r) => r.json())
       .then((d: any) => {
@@ -25,51 +27,76 @@ export default function InvitationPage() {
       });
   }, [router]);
 
-  const link =
-    typeof window !== 'undefined'
-      ? `${window.location.origin}/signup?ref=${userId}`
-      : `/signup?ref=${userId}`;
+  const link = `${origin}/signup?ref=${userId}`;
 
   return (
-    <div className="min-h-screen bg-slate-950 pb-20">
-      <header className="border-b border-slate-800 sticky top-0 bg-slate-950/90 backdrop-blur z-40">
-        <div className="max-w-lg mx-auto px-4 h-14 flex items-center justify-between">
-          <Link href="/dashboard" className="text-slate-400 text-sm">← Dashboard</Link>
-          <span className="font-bold">Invitation</span>
-          <span className="w-16" />
+    <div className="min-h-screen bg-slate-950 text-slate-100 pb-24 relative">
+      <div className="fixed inset-0 pointer-events-none">
+        <div className="absolute top-20 right-0 w-72 h-72 bg-emerald-500/15 blur-[100px] rounded-full" />
+      </div>
+      <UserNav />
+      <main className="max-w-lg mx-auto px-4 py-5 space-y-4 relative z-10">
+        <div className="text-center mb-2">
+          <h1 className="text-2xl font-extrabold">Invite & earn 20%</h1>
+          <p className="text-sm text-slate-400 mt-1">Commission on every paid plan your friends buy</p>
         </div>
-      </header>
-      <main className="max-w-lg mx-auto px-4 py-6 space-y-5">
-        <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-5 text-center">
-          <p className="text-sm text-slate-300">Referral earnings (20% of paid plans)</p>
-          <p className="text-3xl font-extrabold text-emerald-400 mt-1">{earnings.toFixed(2)} USDT</p>
-          <p className="text-xs text-slate-400 mt-2">{referrals.length} referred users</p>
+
+        <div className="rounded-3xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/15 to-teal-900/20 p-6 text-center shadow-lg shadow-emerald-500/10">
+          <p className="text-sm text-slate-300">Referral earnings</p>
+          <p className="text-4xl font-black text-emerald-400 mt-1">{earnings.toFixed(2)}</p>
+          <p className="text-sm text-emerald-300/80">USDT</p>
+          <div className="mt-4 inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-black/30 border border-white/10 text-sm">
+            <span className="text-slate-400">Referrals</span>
+            <span className="font-bold text-white">{referrals.length}</span>
+          </div>
         </div>
-        <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-4 space-y-2">
-          <p className="text-sm font-medium">Your referral link</p>
-          <code className="text-xs break-all block bg-slate-950 p-3 rounded-lg">{link}</code>
+
+        <div className="rounded-2xl border border-white/5 bg-slate-900/60 p-4 space-y-3">
+          <p className="text-sm font-semibold">Your referral link</p>
+          <code className="text-xs break-all block bg-slate-950 p-3 rounded-xl border border-slate-800 font-mono text-slate-300">
+            {userId ? link : '…'}
+          </code>
           <button
             onClick={() => {
               navigator.clipboard.writeText(link);
               setCopied(true);
               setTimeout(() => setCopied(false), 2000);
             }}
-            className="w-full py-2 rounded-xl bg-emerald-500 text-slate-950 font-bold"
+            disabled={!userId}
+            className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-bold shadow-lg shadow-emerald-500/20 disabled:opacity-50"
           >
-            {copied ? 'Copied!' : 'Copy link'}
+            {copied ? 'Copied!' : 'Copy referral link'}
           </button>
-          <p className="text-xs text-slate-500">
-            Your user ID / referral code: <strong className="text-slate-300">{userId}</strong>
-          </p>
+          <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
+            <span>
+              User ID / code:{' '}
+              <strong className="text-emerald-400 font-mono">{userId || '—'}</strong>
+            </span>
+            <button
+              type="button"
+              onClick={() => userId && navigator.clipboard.writeText(userId)}
+              className="text-emerald-400 font-medium"
+            >
+              Copy ID
+            </button>
+          </div>
         </div>
-        <div>
-          <h2 className="font-semibold mb-2">Referrals</h2>
+
+        <div className="rounded-2xl border border-white/5 bg-slate-900/40 overflow-hidden">
+          <div className="px-4 py-3 border-b border-white/5">
+            <h2 className="font-semibold">Referred users</h2>
+          </div>
           {referrals.length === 0 ? (
-            <p className="text-slate-500 text-sm">No referrals yet</p>
+            <p className="p-6 text-center text-slate-500 text-sm">
+              Share your link — referrals appear here when they sign up.
+            </p>
           ) : (
-            <ul className="space-y-2">
-              {referrals.map((id) => (
-                <li key={id} className="rounded-lg border border-slate-800 px-3 py-2 text-sm font-mono">{id}</li>
+            <ul className="divide-y divide-white/5 max-h-64 overflow-y-auto">
+              {referrals.map((id, i) => (
+                <li key={id} className="px-4 py-3 flex items-center justify-between text-sm">
+                  <span className="text-slate-500">#{i + 1}</span>
+                  <code className="font-mono text-emerald-300">{id}</code>
+                </li>
               ))}
             </ul>
           )}
