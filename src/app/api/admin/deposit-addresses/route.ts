@@ -1,21 +1,22 @@
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import { getStorage } from '@/lib/memory-kv';
+import { ensureSeeded } from '@/lib/kv';
 import {
-  ensureSeeded,
   listDepositAddresses,
   addDepositAddress,
   updateDepositAddress,
   removeDepositAddress,
-} from '@/lib/kv';
-import { getAdminToken, parseToken } from '@/lib/auth';
+  setActiveDepositAddress,
+} from '@/lib/kv-deposit';
+import { parseToken, ADMIN_COOKIE } from '@/lib/auth';
 
 export const runtime = 'edge';
 
 function requireAdmin() {
-  const tok = getAdminToken();
-  if (!tok) return null;
-  const p = parseToken(tok);
-  return p?.role === 'admin' ? p : null;
+  const token = cookies().get(ADMIN_COOKIE)?.value;
+  const parsed = parseToken(token);
+  return parsed?.role === 'admin';
 }
 
 export async function GET() {
@@ -34,60 +35,50 @@ export async function POST(req: Request) {
   }
   const kv = getStorage();
   await ensureSeeded(kv);
-  const body = await req.json().catch(() => ({}));
+  const body: any = await req.json().catch(() => ({}));
   const action = String(body.action || 'add');
 
   if (action === 'add') {
     const address = String(body.address || '').trim();
-    if (address.length < 20) {
-      return NextResponse.json({ ok: false, message: 'Valid TRC-20 address required' }, { status: 400 });
-    }
+    const label = body.label ? String(body.label) : 'USDT TRC20';
+    const setActive = body.setActive !== false;
+    if (!address) return NextResponse.json({ ok: false, message: 'Address required' }, { status: 400 });
+    // TRON base58 addresses start with T and are 34 chars typically
     if (!/^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(address)) {
-      return NextResponse.json(
-        { ok: false, message: 'Address must be a TRON base58 address (starts with T)' },
-        { status: 400 }
-      );
+      return NextResponse.json({ ok: false, message: 'Invalid TRON/TRC-20 address' }, { status: 400 });
     }
-    const entry = await addDepositAddress(kv, address, body.label, body.setActive !== false);
-    const addresses = await listDepositAddresses(kv);
-    return NextResponse.json({ ok: true, entry, addresses });
+    const list = await addDepositAddress(kv, { network: 'TRC20', address, label, active: setActive });
+    if (setActive) {
+      const added = list[list.length - 1];
+      if (added) await setActiveDepositAddress(kv, added.id);
+    }
+    return NextResponse.json({ ok: true, addresses: await listDepositAddresses(kv) });
   }
 
   if (action === 'update') {
     const id = String(body.id || '');
     if (!id) return NextResponse.json({ ok: false, message: 'id required' }, { status: 400 });
-    if (body.address) {
-      const address = String(body.address).trim();
-      if (!/^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(address)) {
-        return NextResponse.json({ ok: false, message: 'Invalid TRON address' }, { status: 400 });
-      }
-    }
-    const entry = await updateDepositAddress(kv, id, {
-      address: body.address,
-      label: body.label,
-      active: body.active,
-    });
-    if (!entry) return NextResponse.json({ ok: false, message: 'Not found' }, { status: 404 });
-    const addresses = await listDepositAddresses(kv);
-    return NextResponse.json({ ok: true, entry, addresses });
-  }
-
-  if (action === 'setActive') {
-    const id = String(body.id || '');
-    if (!id) return NextResponse.json({ ok: false, message: 'id required' }, { status: 400 });
-    const entry = await updateDepositAddress(kv, id, { active: true });
-    if (!entry) return NextResponse.json({ ok: false, message: 'Not found' }, { status: 404 });
-    const addresses = await listDepositAddresses(kv);
-    return NextResponse.json({ ok: true, entry, addresses });
+    const patch: Record<string, unknown> = {};
+    if (body.address !== undefined) patch.address = String(body.address).trim();
+    if (body.label !== undefined) patch.label = String(body.label);
+    if (body.active !== undefined) patch.active = Boolean(body.active);
+    if (body.network !== undefined) patch.network = String(body.network);
+    await updateDepositAddress(kv, id, patch as any);
+    return NextResponse.json({ ok: true, addresses: await listDepositAddresses(kv) });
   }
 
   if (action === 'remove') {
     const id = String(body.id || '');
     if (!id) return NextResponse.json({ ok: false, message: 'id required' }, { status: 400 });
-    const ok = await removeDepositAddress(kv, id);
-    if (!ok) return NextResponse.json({ ok: false, message: 'Not found' }, { status: 404 });
-    const addresses = await listDepositAddresses(kv);
-    return NextResponse.json({ ok: true, addresses });
+    await removeDepositAddress(kv, id);
+    return NextResponse.json({ ok: true, addresses: await listDepositAddresses(kv) });
+  }
+
+  if (action === 'setActive') {
+    const id = String(body.id || '');
+    if (!id) return NextResponse.json({ ok: false, message: 'id required' }, { status: 400 });
+    await setActiveDepositAddress(kv, id);
+    return NextResponse.json({ ok: true, addresses: await listDepositAddresses(kv) });
   }
 
   return NextResponse.json({ ok: false, message: 'Unknown action' }, { status: 400 });
