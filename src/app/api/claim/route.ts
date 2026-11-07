@@ -1,20 +1,41 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getStorage } from '@/lib/memory-kv';
 import {
-  ensureSeeded, getUser, saveUser, getUserPlans, saveUserPlans,
-  saveTx, generateId, isSameDay, getAnalytics, saveAnalytics,
+  ensureSeeded,
+  getUser,
+  saveUser,
+  getUserPlans,
+  saveUserPlans,
+  saveTx,
+  generateId,
+  isSameDay,
+  getAnalytics,
+  saveAnalytics,
 } from '@/lib/kv';
 import { getUserToken, parseToken } from '@/lib/auth';
 import type { Transaction } from '@/types';
 
 export const runtime = 'edge';
 
-/** Claim daily yield from ALL active (non-expired) plans in one action. */
-export async function POST() {
+/**
+ * Claim daily yield for ONE purchased plan.
+ * Body: { userPlanId: string }
+ * Each plan has its own lastClaimedAt — Free/Bronze and Silver can be claimed separately same day.
+ */
+export async function POST(req: NextRequest) {
   const token = getUserToken();
   if (!token) return NextResponse.json({ ok: false, message: 'Unauthorized' }, { status: 401 });
   const parsed = parseToken(token);
   if (!parsed) return NextResponse.json({ ok: false, message: 'Unauthorized' }, { status: 401 });
+
+  const body: any = await req.json().catch(() => ({}));
+  const userPlanId = String(body.userPlanId || '').trim();
+  if (!userPlanId) {
+    return NextResponse.json(
+      { ok: false, message: 'Select a plan to claim (userPlanId required)' },
+      { status: 400 }
+    );
+  }
 
   const kv = getStorage();
   await ensureSeeded(kv);
@@ -22,62 +43,85 @@ export async function POST() {
   if (!user) return NextResponse.json({ ok: false, message: 'User not found' }, { status: 404 });
 
   const now = new Date().toISOString();
-  if (isSameDay(user.lastClaimDate, now)) {
-    return NextResponse.json({ ok: false, message: 'Already claimed today. Come back tomorrow.' }, { status: 400 });
-  }
-
   let plans = await getUserPlans(kv, user.id);
-  let total = 0;
-  const breakdown: { name: string; dailyYield: number }[] = [];
 
+  // Expire outdated plans
   plans = plans.map((p) => {
-    if (p.status !== 'active') return p;
-    if (new Date(p.expiryDate) < new Date()) {
+    if (p.status === 'active' && new Date(p.expiryDate) < new Date()) {
       return { ...p, status: 'expired' as const };
     }
-    // Sum every active plan (e.g. Bronze + Silver both pay)
-    total += Number(p.dailyYield) || 0;
-    breakdown.push({ name: p.name, dailyYield: p.dailyYield });
-    return {
-      ...p,
-      lastClaimedAt: now,
-      claimedDays: (p.claimedDays || 0) + 1,
-    };
+    return p;
   });
 
-  if (total <= 0) {
-    await saveUserPlans(kv, user.id, plans);
-    return NextResponse.json({ ok: false, message: 'No active plans to claim. Buy a plan first.' }, { status: 400 });
+  const idx = plans.findIndex((p) => p.userPlanId === userPlanId);
+  if (idx < 0) {
+    return NextResponse.json({ ok: false, message: 'Plan not found' }, { status: 404 });
   }
 
-  total = Number(total.toFixed(6));
-  user.withdrawalBalance = Number((user.withdrawalBalance + total).toFixed(6));
-  user.todayEarnings = total;
+  const plan = plans[idx];
+  if (plan.status !== 'active') {
+    return NextResponse.json({ ok: false, message: 'This plan is expired' }, { status: 400 });
+  }
+  if (new Date(plan.expiryDate) < new Date()) {
+    plans[idx] = { ...plan, status: 'expired' };
+    await saveUserPlans(kv, user.id, plans);
+    return NextResponse.json({ ok: false, message: 'This plan is expired' }, { status: 400 });
+  }
+
+  // Per-plan daily claim lock (not global)
+  if (isSameDay(plan.lastClaimedAt, now)) {
+    return NextResponse.json(
+      {
+        ok: false,
+        message: `Already claimed ${plan.name} today. Come back tomorrow.`,
+      },
+      { status: 400 }
+    );
+  }
+
+  const amount = Number(plan.dailyYield) || 0;
+  if (amount <= 0) {
+    return NextResponse.json({ ok: false, message: 'Invalid plan yield' }, { status: 400 });
+  }
+
+  plans[idx] = {
+    ...plan,
+    lastClaimedAt: now,
+    claimedDays: (plan.claimedDays || 0) + 1,
+  };
+
+  user.withdrawalBalance = Number((user.withdrawalBalance + amount).toFixed(6));
+  // todayEarnings = sum of claims done today (approx: add this claim)
+  if (isSameDay(user.lastClaimDate, now)) {
+    user.todayEarnings = Number((user.todayEarnings + amount).toFixed(6));
+  } else {
+    user.todayEarnings = amount;
+  }
   user.lastClaimDate = now;
+
   await saveUser(kv, user);
   await saveUserPlans(kv, user.id, plans);
 
-  const planNames = breakdown.map((b) => b.name).join(' + ');
   await saveTx(kv, {
     id: generateId('tx'),
     userId: user.id,
     type: 'yield',
-    amount: total,
+    amount,
     status: 'completed',
-    description: `Daily yield ${total} USDT from ${breakdown.length} plan(s): ${planNames}`,
+    description: `Daily claim ${amount} USDT — ${plan.name}`,
     timestamp: now,
   } as Transaction);
 
   const analytics = await getAnalytics(kv);
-  analytics.totalYieldPaid = Number((analytics.totalYieldPaid + total).toFixed(6));
+  analytics.totalYieldPaid = Number((analytics.totalYieldPaid + amount).toFixed(6));
   await saveAnalytics(kv, analytics);
 
   return NextResponse.json({
     ok: true,
-    claimed: total,
-    planCount: breakdown.length,
-    breakdown,
+    claimed: amount,
+    planName: plan.name,
+    userPlanId: plan.userPlanId,
     withdrawalBalance: user.withdrawalBalance,
-    message: `Claimed ${total} USDT from ${breakdown.length} plan(s)`,
+    message: `Claimed ${amount} USDT from ${plan.name}`,
   });
 }

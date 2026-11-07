@@ -6,6 +6,16 @@ import { useRouter } from 'next/navigation';
 import { UserNav } from '@/components/UserNav';
 import { useThemeLang } from '@/components/ThemeLangProvider';
 
+function sameDay(a: string | null | undefined, b = new Date()) {
+  if (!a) return false;
+  const d = new Date(a);
+  return (
+    d.getFullYear() === b.getFullYear() &&
+    d.getMonth() === b.getMonth() &&
+    d.getDate() === b.getDate()
+  );
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const { t } = useThemeLang();
@@ -14,7 +24,7 @@ export default function DashboardPage() {
   const [depInfo, setDepInfo] = useState<any>(null);
   const [msg, setMsg] = useState('');
   const [secondsLeft, setSecondsLeft] = useState(0);
-  const [claiming, setClaiming] = useState(false);
+  const [claimingId, setClaimingId] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -98,22 +108,22 @@ export default function DashboardPage() {
     startPolling(d.depositId);
   }
 
-  async function claim() {
-    setClaiming(true);
-    const d: any = await fetch('/api/claim', { method: 'POST' }).then((r) => r.json());
-    if (d.ok) {
-      const parts = (d.breakdown || [])
-        .map((b: any) => `${b.name} +${b.dailyYield}`)
-        .join(', ');
-      setMsg(
-        d.message ||
-          `Claimed ${d.claimed} USDT from ${d.planCount || 1} plan(s)${parts ? ` (${parts})` : ''}`
-      );
-      loadMe();
-    } else {
-      setMsg(d.message || 'Claim failed');
+  /** Claim one plan only */
+  async function claimPlan(userPlanId: string, planName: string) {
+    setClaimingId(userPlanId);
+    setMsg('');
+    try {
+      const d: any = await fetch('/api/claim', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userPlanId }),
+      }).then((r) => r.json());
+      setMsg(d.message || (d.ok ? `Claimed ${d.claimed} USDT from ${planName}` : 'Claim failed'));
+      if (d.ok) loadMe();
+    } catch {
+      setMsg('Network error');
     }
-    setClaiming(false);
+    setClaimingId(null);
   }
 
   if (!data) {
@@ -130,20 +140,15 @@ export default function DashboardPage() {
   const activePlans = (plans || []).filter(
     (p: any) => p.status === 'active' && new Date(p.expiryDate) > new Date()
   );
-  const dailyPotential = activePlans.reduce(
+  const claimableToday = activePlans.filter((p: any) => !sameDay(p.lastClaimedAt));
+  const dailyPotential = claimableToday.reduce(
     (sum: number, p: any) => sum + (Number(p.dailyYield) || 0),
     0
   );
-  const alreadyClaimedToday =
-    user.lastClaimDate &&
-    new Date(user.lastClaimDate).toDateString() === new Date().toDateString();
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 pb-28 relative">
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute -top-24 right-0 w-80 h-80 bg-emerald-500/20 blur-[110px] rounded-full" />
-        <div className="absolute bottom-40 left-0 w-64 h-64 bg-teal-500/10 blur-[90px] rounded-full" />
-      </div>
+      <div className="fixed inset-0 pointer-events-none overflow-hidden mesh-bg" />
       <UserNav />
       <main className="max-w-lg mx-auto px-4 py-5 space-y-4 relative z-10">
         <div className="flex items-center justify-between gap-3">
@@ -187,57 +192,92 @@ export default function DashboardPage() {
               </div>
             ))}
           </div>
-
-          {/* Multi-plan claim hint */}
-          {activePlans.length > 0 && (
-            <div className="mt-3 rounded-xl bg-black/25 border border-white/5 px-3 py-2 text-xs text-slate-300">
-              Daily claim from <strong className="text-white">{activePlans.length}</strong> plan
-              {activePlans.length > 1 ? 's' : ''}:{' '}
-              <strong className="text-emerald-300">{dailyPotential.toFixed(2)} USDT</strong>
-              {activePlans.length > 1 && (
-                <span className="block text-slate-500 mt-0.5">
-                  {activePlans.map((p: any) => `${p.name} ${p.dailyYield}`).join(' + ')}
-                </span>
-              )}
-            </div>
-          )}
-
-          <button
-            onClick={claim}
-            disabled={claiming || alreadyClaimedToday || activePlans.length === 0}
-            className="mt-4 w-full py-3.5 rounded-2xl bg-gradient-to-r from-emerald-400 to-teal-500 text-slate-950 font-extrabold text-base shadow-lg shadow-emerald-500/30 disabled:opacity-45 disabled:shadow-none active:scale-[0.98] transition"
-          >
-            {claiming
-              ? 'Claiming…'
-              : alreadyClaimedToday
-                ? 'Already claimed today'
-                : activePlans.length === 0
-                  ? 'Buy a plan to claim'
-                  : `Claim ${dailyPotential.toFixed(2)} USDT (${activePlans.length} plan${activePlans.length > 1 ? 's' : ''})`}
-          </button>
+          <p className="mt-3 text-xs text-slate-400 text-center">
+            Claim each plan separately ·{' '}
+            {claimableToday.length > 0
+              ? `${claimableToday.length} ready · up to ${dailyPotential.toFixed(2)} USDT`
+              : activePlans.length > 0
+                ? 'All plans claimed today'
+                : 'Buy a plan to start'}
+          </p>
         </div>
 
-        {/* Upsell if low deposit or few plans */}
-        {(user.depositBalance >= 10 || activePlans.length < 2) && (
-          <Link
-            href="/plans"
-            className="block rounded-2xl border border-amber-500/25 bg-gradient-to-r from-amber-500/10 to-orange-500/5 p-4 hover:border-amber-400/40 transition"
-          >
-            <p className="font-bold text-amber-200 text-sm">Boost daily earnings</p>
-            <p className="text-xs text-slate-400 mt-1">
-              Stack multiple plans — claim combines all active yields in one tap.
-            </p>
-            <span className="inline-block mt-2 text-xs font-bold text-emerald-400">View plans →</span>
-          </Link>
-        )}
+        {/* Per-plan claim cards */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="font-semibold">Your plans & claims</h2>
+            <Link href="/plans" className="text-xs font-semibold text-emerald-400">
+              + Buy plan
+            </Link>
+          </div>
+
+          {activePlans.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-emerald-500/30 bg-emerald-500/5 p-6 text-center">
+              <p className="text-slate-300 text-sm font-medium mb-1">No active plans</p>
+              <p className="text-xs text-slate-500 mb-4">Buy Silver, Gold or Platinum to earn daily</p>
+              <Link
+                href="/plans"
+                className="inline-flex px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 text-sm font-bold shadow-lg shadow-emerald-500/25"
+              >
+                Browse plans
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {activePlans.map((p: any) => {
+                const claimedToday = sameDay(p.lastClaimedAt);
+                const isClaiming = claimingId === p.userPlanId;
+                return (
+                  <div
+                    key={p.userPlanId}
+                    className="rounded-2xl border border-white/10 bg-slate-900/70 p-4 space-y-3"
+                  >
+                    <div className="flex justify-between items-start gap-3">
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-bold text-lg">{p.name}</p>
+                          <span className="chip border-emerald-500/30 bg-emerald-500/10 text-emerald-300">
+                            active
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-400 mt-1">
+                          Expires {new Date(p.expiryDate).toLocaleDateString()} · day{' '}
+                          {(p.claimedDays || 0) + (claimedToday ? 0 : 0)}/{p.durationDays || '—'}
+                        </p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-xl font-black text-emerald-400">+{p.dailyYield}</p>
+                        <p className="text-[10px] text-slate-500 uppercase">USDT / day</p>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => claimPlan(p.userPlanId, p.name)}
+                      disabled={claimedToday || isClaiming}
+                      className={`w-full py-3 rounded-xl font-bold transition active:scale-[0.98] disabled:opacity-50 ${
+                        claimedToday
+                          ? 'bg-slate-800 text-slate-400 border border-slate-700'
+                          : 'btn-primary'
+                      }`}
+                    >
+                      {isClaiming
+                        ? 'Claiming…'
+                        : claimedToday
+                          ? `✓ ${p.name} claimed today`
+                          : `Claim ${p.dailyYield} USDT · ${p.name}`}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
 
         {/* Deposit */}
         <div className="rounded-2xl border border-white/5 bg-slate-900/70 p-4 space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="font-semibold">Deposit USDT</h2>
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 font-medium">
-              TRC-20 only
-            </span>
+            <span className="chip border-amber-500/30 bg-amber-500/10 text-amber-300">TRC-20</span>
           </div>
           {!depInfo ? (
             <>
@@ -248,12 +288,9 @@ export default function DashboardPage() {
                 value={depAmount}
                 onChange={(e) => setDepAmount(e.target.value)}
                 placeholder="Amount in USDT"
-                className="w-full px-4 py-3.5 rounded-xl bg-slate-950 border border-slate-700 focus:border-emerald-500 outline-none text-base"
+                className="input-field"
               />
-              <button
-                onClick={startDeposit}
-                className="w-full py-3 rounded-xl bg-emerald-500 text-slate-950 font-bold hover:bg-emerald-400 transition"
-              >
+              <button onClick={startDeposit} className="btn-primary w-full">
                 Generate deposit address
               </button>
             </>
@@ -282,7 +319,9 @@ export default function DashboardPage() {
                 </button>
               </div>
               {secondsLeft > 0 && (
-                <p className="text-center font-mono text-2xl text-amber-400 tracking-widest">{mm}:{ss}</p>
+                <p className="text-center font-mono text-2xl text-amber-400 tracking-widest">
+                  {mm}:{ss}
+                </p>
               )}
               <button
                 type="button"
@@ -299,60 +338,10 @@ export default function DashboardPage() {
                     loadMe();
                   } else setMsg(d.reason || 'Not confirmed on-chain yet');
                 }}
-                className="w-full py-2.5 rounded-xl bg-slate-700 text-sm font-medium hover:bg-slate-600"
+                className="btn-ghost w-full text-sm"
               >
                 Check chain now
               </button>
-            </div>
-          )}
-        </div>
-
-        {/* Active plans */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="font-semibold">Active plans ({activePlans.length})</h2>
-            <Link href="/plans" className="text-xs font-semibold text-emerald-400">
-              + Add plan
-            </Link>
-          </div>
-          {activePlans.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-emerald-500/30 bg-emerald-500/5 p-6 text-center">
-              <p className="text-slate-300 text-sm font-medium mb-1">No active plans</p>
-              <p className="text-xs text-slate-500 mb-4">Buy Silver, Gold or Platinum to start earning daily</p>
-              <Link
-                href="/plans"
-                className="inline-flex px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 text-sm font-bold shadow-lg shadow-emerald-500/25"
-              >
-                Browse plans
-              </Link>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {activePlans.map((p: any) => (
-                <div
-                  key={p.userPlanId || p.planId}
-                  className="rounded-2xl border border-white/5 bg-slate-900/70 p-3.5 flex justify-between items-center"
-                >
-                  <div>
-                    <p className="font-semibold">{p.name}</p>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      <span className="text-emerald-300 font-semibold">{p.dailyYield} USDT</span>/day · expires{' '}
-                      {new Date(p.expiryDate).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <span className="text-[10px] uppercase tracking-wide px-2 py-1 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-bold">
-                    active
-                  </span>
-                </div>
-              ))}
-              {activePlans.length === 1 && (
-                <Link
-                  href="/plans"
-                  className="block text-center text-xs text-emerald-400 font-medium py-2 rounded-xl border border-dashed border-emerald-500/25 hover:bg-emerald-500/5"
-                >
-                  + Stack another plan to increase daily claim
-                </Link>
-              )}
             </div>
           )}
         </div>
@@ -361,7 +350,9 @@ export default function DashboardPage() {
         <div>
           <div className="flex items-center justify-between mb-2">
             <h2 className="font-semibold">Recent activity</h2>
-            <Link href="/account" className="text-xs text-emerald-400 font-medium">Full history</Link>
+            <Link href="/account" className="text-xs text-emerald-400 font-medium">
+              Full history
+            </Link>
           </div>
           <div className="rounded-2xl border border-white/5 bg-slate-900/50 divide-y divide-white/5 overflow-hidden">
             {(transactions || []).slice(0, 6).map((tx: any) => (
