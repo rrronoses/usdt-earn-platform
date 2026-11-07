@@ -20,6 +20,7 @@ export type Env = { USDTSTORAGE: KVNamespace };
 export const keys = {
   user: (id: string) => `user:${id}`,
   email: (email: string) => `email:${email.toLowerCase()}`,
+  username: (username: string) => `username:${username.toLowerCase()}`,
   plan: (id: string) => `plan:${id}`,
   plansIndex: () => `plans:index`,
   userPlans: (userId: string) => `user_plans:${userId}`,
@@ -47,6 +48,23 @@ export async function putJSON(kv: KVNamespace, key: string, value: unknown) {
   await kv.put(key, JSON.stringify(value));
 }
 
+/** Read index value that may be raw string or JSON-quoted string (legacy). */
+async function getIndexId(kv: KVNamespace, key: string): Promise<string | null> {
+  const raw = await kv.get(key);
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  // Legacy bug: putJSON stored "\"12345678\"" or "\"12345678\""
+  if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (typeof parsed === 'string' && parsed) return parsed;
+    } catch {
+      /* fall through */
+    }
+  }
+  return trimmed || null;
+}
+
 export async function ensureSeeded(kv: KVNamespace) {
   const cfg = await getJSON(kv, keys.config());
   if (!cfg) await putJSON(kv, keys.config(), DEFAULT_CONFIG);
@@ -68,14 +86,41 @@ export async function getUser(kv: KVNamespace, userId: string) {
 }
 
 export async function getUserByEmail(kv: KVNamespace, email: string) {
-  const id = await kv.get(keys.email(email));
+  const id = await getIndexId(kv, keys.email(email));
   if (!id) return null;
   return getUser(kv, id);
 }
 
+export async function getUserByUsername(kv: KVNamespace, username: string) {
+  const id = await getIndexId(kv, keys.username(username));
+  if (id) {
+    const u = await getUser(kv, id);
+    if (u) return u;
+  }
+  // Fallback scan for older accounts without username index
+  const users = await listUsers(kv, 500);
+  const lower = username.toLowerCase();
+  return users.find((u) => u.username.toLowerCase() === lower) || null;
+}
+
+/** Resolve login identifier: email or username */
+export async function getUserByLogin(kv: KVNamespace, login: string) {
+  const q = login.trim();
+  if (!q) return null;
+  if (q.includes('@')) {
+    return getUserByEmail(kv, q.toLowerCase());
+  }
+  const byUser = await getUserByUsername(kv, q);
+  if (byUser) return byUser;
+  // Also try email path in case someone typed email without @ somehow
+  return getUserByEmail(kv, q.toLowerCase());
+}
+
 export async function saveUser(kv: KVNamespace, user: User) {
   await putJSON(kv, keys.user(user.id), user);
-  await putJSON(kv, keys.email(user.email), user.id);
+  // Store indexes as RAW strings (not JSON) so get() returns the id directly
+  await kv.put(keys.email(user.email), user.id);
+  await kv.put(keys.username(user.username), user.id);
 }
 
 export async function listUsers(kv: KVNamespace, limit = 200): Promise<User[]> {

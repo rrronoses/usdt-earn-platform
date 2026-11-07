@@ -1,8 +1,18 @@
 import { NextResponse } from 'next/server';
 import { getStorage } from '@/lib/memory-kv';
 import {
-  ensureSeeded, getUserByEmail, saveUser, saveUserPlans, saveTx, getAnalytics, saveAnalytics,
-  generateUserId, generateId, addDaysISO,
+  ensureSeeded,
+  getUserByEmail,
+  getUserByUsername,
+  saveUser,
+  saveUserPlans,
+  saveTx,
+  getAnalytics,
+  saveAnalytics,
+  generateUserId,
+  generateId,
+  addDaysISO,
+  getUser,
 } from '@/lib/kv';
 import { hashPassword, createToken, userCookieOptions } from '@/lib/auth';
 import type { User, UserPlan, Transaction } from '@/types';
@@ -18,13 +28,19 @@ export async function POST(req: Request) {
     const referralCode = body.referralCode ? String(body.referralCode).trim() : undefined;
 
     if (!username || username.length < 3) {
-      return NextResponse.json({ ok: false, message: 'Username must be at least 3 characters' }, { status: 400 });
+      return NextResponse.json(
+        { ok: false, message: 'Username must be at least 3 characters' },
+        { status: 400 }
+      );
     }
     if (!email || !email.includes('@')) {
       return NextResponse.json({ ok: false, message: 'Valid email required' }, { status: 400 });
     }
     if (password.length < 6) {
-      return NextResponse.json({ ok: false, message: 'Password must be at least 6 characters' }, { status: 400 });
+      return NextResponse.json(
+        { ok: false, message: 'Password must be at least 6 characters' },
+        { status: 400 }
+      );
     }
 
     const kv = getStorage();
@@ -33,10 +49,12 @@ export async function POST(req: Request) {
     if (await getUserByEmail(kv, email)) {
       return NextResponse.json({ ok: false, message: 'Email already registered' }, { status: 400 });
     }
+    if (await getUserByUsername(kv, username)) {
+      return NextResponse.json({ ok: false, message: 'Username already taken' }, { status: 400 });
+    }
 
     let referredBy: string | null = null;
     if (referralCode) {
-      const { getUser } = await import('@/lib/kv');
       const ref = await getUser(kv, referralCode);
       if (!ref) {
         return NextResponse.json({ ok: false, message: 'Invalid referral code' }, { status: 400 });
@@ -46,11 +64,13 @@ export async function POST(req: Request) {
 
     const id = generateUserId();
     const now = new Date().toISOString();
+    const passwordHash = hashPassword(password);
+
     const user: User = {
       id,
       username,
       email,
-      passwordHash: hashPassword(password),
+      passwordHash,
       depositBalance: 3,
       withdrawalBalance: 0,
       todayEarnings: 0,
@@ -67,10 +87,9 @@ export async function POST(req: Request) {
     await saveUser(kv, user);
 
     if (referredBy) {
-      const { getUser } = await import('@/lib/kv');
       const ref = await getUser(kv, referredBy);
       if (ref) {
-        ref.referrals = [...ref.referrals, id];
+        ref.referrals = [...(ref.referrals || []), id];
         await saveUser(kv, ref);
       }
     }

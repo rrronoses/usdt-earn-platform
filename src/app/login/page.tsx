@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('');
+  const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -19,7 +19,7 @@ export default function LoginPage() {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ login: login.trim(), password }),
       });
       const data: any = await res.json();
       if (!data.ok) {
@@ -54,17 +54,20 @@ export default function LoginPage() {
 
         <form onSubmit={onSubmit} className="card-premium p-6 space-y-4">
           {error && (
-            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{error}</div>
+            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+              {error}
+            </div>
           )}
           <div>
-            <label className="block text-sm text-slate-300 mb-1.5 font-medium">Email</label>
+            <label className="block text-sm text-slate-300 mb-1.5 font-medium">Email or username</label>
             <input
-              type="email"
+              type="text"
               required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="username"
+              value={login}
+              onChange={(e) => setLogin(e.target.value)}
               className="input-field"
-              placeholder="you@email.com"
+              placeholder="you@email.com or username"
             />
           </div>
           <div>
@@ -72,6 +75,7 @@ export default function LoginPage() {
             <input
               type="password"
               required
+              autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="input-field"

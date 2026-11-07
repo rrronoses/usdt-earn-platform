@@ -1,14 +1,21 @@
 import { NextResponse } from 'next/server';
 import { getStorage } from '@/lib/memory-kv';
-import { ensureSeeded, getUserByEmail, getConfig } from '@/lib/kv';
-import { verifyPassword, createToken, userCookieOptions, adminCookieOptions, hashPassword } from '@/lib/auth';
+import { ensureSeeded, getUserByLogin, getConfig, saveUser } from '@/lib/kv';
+import {
+  verifyPassword,
+  createToken,
+  userCookieOptions,
+  adminCookieOptions,
+  hashPassword,
+} from '@/lib/auth';
 
 export const runtime = 'edge';
 
 export async function POST(req: Request) {
   try {
     const body: any = await req.json();
-    const email = String(body.email || '').trim().toLowerCase();
+    // Accept email OR username in `login` or legacy `email` field
+    const login = String(body.login || body.email || body.username || '').trim();
     const password = String(body.password || '');
     const asAdmin = Boolean(body.asAdmin);
 
@@ -17,10 +24,12 @@ export async function POST(req: Request) {
 
     if (asAdmin) {
       const cfg = await getConfig(kv);
-      const username = String(body.username || email || '').trim();
+      const username = String(body.username || login || '').trim();
       const ok =
         username === cfg.adminUsername &&
-        (password === cfg.adminPasswordHash || verifyPassword(password, cfg.adminPasswordHash) || hashPassword(password) === cfg.adminPasswordHash);
+        (password === cfg.adminPasswordHash ||
+          verifyPassword(password, cfg.adminPasswordHash) ||
+          hashPassword(password) === cfg.adminPasswordHash);
       const demoOk = username === 'admin' && password === 'admin123';
       if (!ok && !demoOk) {
         return NextResponse.json({ ok: false, message: 'Invalid admin credentials' }, { status: 401 });
@@ -31,12 +40,43 @@ export async function POST(req: Request) {
       return res;
     }
 
-    const user = await getUserByEmail(kv, email);
-    if (!user || !verifyPassword(password, user.passwordHash)) {
-      return NextResponse.json({ ok: false, message: 'Invalid email or password' }, { status: 401 });
+    if (!login || !password) {
+      return NextResponse.json(
+        { ok: false, message: 'Email/username and password required' },
+        { status: 400 }
+      );
     }
+
+    const user = await getUserByLogin(kv, login);
+    if (!user) {
+      return NextResponse.json(
+        { ok: false, message: 'Invalid email/username or password' },
+        { status: 401 }
+      );
+    }
+
+    // Support both hashed and (legacy) plain stored passwords
+    const passOk =
+      verifyPassword(password, user.passwordHash) ||
+      user.passwordHash === password ||
+      hashPassword(password) === user.passwordHash;
+
+    if (!passOk) {
+      return NextResponse.json(
+        { ok: false, message: 'Invalid email/username or password' },
+        { status: 401 }
+      );
+    }
+
     if (user.status === 'banned') {
       return NextResponse.json({ ok: false, message: 'Account is banned' }, { status: 403 });
+    }
+
+    // Repair indexes for older accounts (raw email + username keys)
+    try {
+      await saveUser(kv, user);
+    } catch {
+      /* non-fatal */
     }
 
     const token = createToken(user.id, 'user');
