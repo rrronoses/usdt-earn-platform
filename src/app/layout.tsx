@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { ThemeLangProvider } from '@/components/ThemeLangProvider';
 
@@ -15,10 +15,17 @@ export const metadata: Metadata = {
   },
 };
 
+export const viewport: Viewport = {
+  themeColor: '#020617',
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+};
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
-      <body className="min-h-screen antialiased bg-slate-950 text-slate-100">
+      <body className="min-h-screen antialiased mesh-bg bg-slate-950 text-slate-100">
         <ThemeLangProvider>{children}</ThemeLangProvider>
       </body>
     </html>

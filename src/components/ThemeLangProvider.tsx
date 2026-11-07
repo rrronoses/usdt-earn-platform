@@ -7,7 +7,7 @@ type Lang = 'en' | 'fr';
 
 const dict = {
   en: {
-    dashboard: 'Dashboard',
+    dashboard: 'Home',
     plans: 'Plans',
     invite: 'Invite',
     account: 'Account',
@@ -27,7 +27,7 @@ const dict = {
     theme: 'Theme',
   },
   fr: {
-    dashboard: 'Tableau de bord',
+    dashboard: 'Accueil',
     plans: 'Plans',
     invite: 'Invitation',
     account: 'Compte',
@@ -35,7 +35,7 @@ const dict = {
     deposit: 'Dépôt',
     withdraw: 'Retrait',
     today: "Aujourd'hui",
-    claim: 'Réclamer les gains du jour',
+    claim: 'Réclamer les gains',
     login: 'Connexion',
     signup: "S'inscrire",
     logout: 'Déconnexion',
@@ -105,20 +105,22 @@ export function useThemeLang() {
 export function ThemeLangToggles() {
   const { theme, lang, setTheme, setLang } = useThemeLang();
   return (
-    <div className="flex items-center gap-2 text-xs">
+    <div className="flex items-center gap-1.5">
       <button
         type="button"
         onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-        className="px-2 py-1 rounded-lg border border-slate-600 hover:border-emerald-500/50"
+        className="w-9 h-9 rounded-xl border border-white/10 bg-white/5 hover:border-emerald-500/40 hover:bg-emerald-500/10 flex items-center justify-center text-base transition"
         title="Theme"
+        aria-label="Toggle theme"
       >
         {theme === 'dark' ? '🌙' : '☀️'}
       </button>
       <button
         type="button"
         onClick={() => setLang(lang === 'en' ? 'fr' : 'en')}
-        className="px-2 py-1 rounded-lg border border-slate-600 hover:border-emerald-500/50 uppercase"
+        className="h-9 px-2.5 rounded-xl border border-white/10 bg-white/5 hover:border-emerald-500/40 hover:bg-emerald-500/10 text-[11px] font-bold uppercase tracking-wide transition"
         title="Language"
+        aria-label="Toggle language"
       >
         {lang}
       </button>
