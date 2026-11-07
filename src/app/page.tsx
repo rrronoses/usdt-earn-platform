@@ -80,14 +80,12 @@ const features = [
 export default function HomePage() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 overflow-x-hidden">
-      {/* Ambient background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute -top-40 -right-40 w-[480px] h-[480px] rounded-full bg-emerald-500/15 blur-[120px]" />
         <div className="absolute top-1/3 -left-32 w-[360px] h-[360px] rounded-full bg-teal-500/10 blur-[100px]" />
         <div className="absolute bottom-0 right-1/4 w-[280px] h-[280px] rounded-full bg-cyan-500/10 blur-[90px]" />
       </div>
 
-      {/* Header */}
       <header className="relative z-50 border-b border-white/5 glass sticky top-0">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2.5 font-bold text-lg tracking-tight">
@@ -117,11 +115,10 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* Hero */}
       <section className="relative z-10 max-w-6xl mx-auto px-4 pt-16 sm:pt-24 pb-16 text-center">
         <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-medium mb-6">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-          Live on Cloudflare · USDT TRC-20
+          USDT TRC-20 · Daily yield
         </div>
         <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight leading-[1.1] mb-6">
           Earn USDT
@@ -147,7 +144,6 @@ export default function HomePage() {
           </a>
         </div>
 
-        {/* Trust strip */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-3xl mx-auto">
           {[
             { k: '3 USDT', v: 'Signup bonus' },
@@ -163,7 +159,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Plans */}
       <section id="plans" className="relative z-10 max-w-6xl mx-auto px-4 py-16">
         <div className="text-center mb-10">
           <h2 className="text-3xl sm:text-4xl font-extrabold mb-3">Choose your yield plan</h2>
@@ -231,7 +226,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* How it works */}
       <section id="how" className="relative z-10 max-w-6xl mx-auto px-4 py-16">
         <div className="text-center mb-10">
           <h2 className="text-3xl sm:text-4xl font-extrabold mb-3">How USDT Earn works</h2>
@@ -248,7 +242,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Features */}
       <section id="features" className="relative z-10 max-w-6xl mx-auto px-4 py-16">
         <div className="rounded-3xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/10 via-slate-900/80 to-teal-500/10 p-8 sm:p-12">
           <div className="text-center mb-10">
@@ -271,7 +264,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Final CTA */}
       <section className="relative z-10 max-w-3xl mx-auto px-4 py-16 text-center">
         <div className="rounded-3xl border border-white/10 bg-slate-900/60 p-8 sm:p-12 glow-emerald">
           <h2 className="text-3xl sm:text-4xl font-extrabold mb-4">Ready to earn USDT?</h2>
@@ -293,7 +285,7 @@ export default function HomePage() {
           <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center text-white text-sm">₮</span>
           USDT<span className="text-emerald-400">Earn</span>
         </div>
-        <p className="text-xs text-slate-600">© {new Date().getFullYear()} USDT Earn · usdtearn.pages.dev</p>
+        <p className="text-xs text-slate-600">© {new Date().getFullYear()} USDT Earn</p>
       </footer>
     </div>
   );
