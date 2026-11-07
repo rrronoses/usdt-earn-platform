@@ -3,8 +3,16 @@ import './globals.css';
 import { ThemeLangProvider } from '@/components/ThemeLangProvider';
 
 export const metadata: Metadata = {
-  title: 'USDT Yield Platform',
-  description: 'Invest USDT. Earn daily. Edge-deployed on Cloudflare Pages + KV.',
+  title: 'USDT Earn — Daily USDT Yield Plans',
+  description:
+    'USDT Earn: invest USDT TRC-20, claim daily earnings, earn 20% referral commissions. Start free with 3 USDT.',
+  openGraph: {
+    title: 'USDT Earn',
+    description: 'Invest USDT. Claim daily. Grow with referrals.',
+    url: 'https://usdtearn.pages.dev',
+    siteName: 'USDT Earn',
+    type: 'website',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
