@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { getStorage } from '@/lib/memory-kv';
 import { ensureSeeded } from '@/lib/kv';
 import {
@@ -9,12 +8,12 @@ import {
   removeDepositAddress,
   setActiveDepositAddress,
 } from '@/lib/kv-deposit';
-import { parseToken, ADMIN_COOKIE } from '@/lib/auth';
+import { getAdminToken, parseToken } from '@/lib/auth';
 
 export const runtime = 'edge';
 
 function requireAdmin() {
-  const token = cookies().get(ADMIN_COOKIE)?.value;
+  const token = getAdminToken();
   const parsed = parseToken(token);
   return parsed?.role === 'admin';
 }

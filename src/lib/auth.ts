@@ -9,7 +9,10 @@ export function createToken(userId: string, role: 'user' | 'admin' = 'user'): st
   return Buffer.from(payload).toString('base64url');
 }
 
-export function parseToken(token: string): { userId: string; role: 'user' | 'admin' } | null {
+export function parseToken(
+  token: string | undefined | null
+): { userId: string; role: 'user' | 'admin' } | null {
+  if (!token) return null;
   try {
     const raw = Buffer.from(token, 'base64url').toString('utf8');
     const [userId, , role] = raw.split(':');
