@@ -45,30 +45,61 @@ export async function getActiveDepositAddress(kv: KVNamespace): Promise<DepositA
   return pickRandomDepositAddress(kv);
 }
 
+/** Mark one address enabled in the random pool (does not disable others). */
+export async function setActiveDepositAddress(kv: KVNamespace, id: string): Promise<DepositAddress[]> {
+  const list = await listDepositAddresses(kv);
+  const next = list.map((a) => (a.id === id ? { ...a, active: true } : a));
+  await saveDepositAddresses(kv, next);
+  return next;
+}
+
 export async function addDepositAddress(
   kv: KVNamespace,
-  address: string,
-  label?: string,
-  setActive = true
-): Promise<DepositAddress> {
+  input:
+    | string
+    | {
+        address: string;
+        label?: string;
+        network?: string;
+        active?: boolean;
+      },
+  labelOrSetActive?: string | boolean,
+  setActiveArg = true
+): Promise<DepositAddress[]> {
   const list = await listDepositAddresses(kv);
+
+  let address = '';
+  let label = 'USDT TRC20';
+  let active = true;
+
+  if (typeof input === 'string') {
+    address = input.trim();
+    if (typeof labelOrSetActive === 'string') label = labelOrSetActive.trim() || label;
+    if (typeof labelOrSetActive === 'boolean') active = labelOrSetActive;
+    else active = setActiveArg;
+  } else {
+    address = String(input.address || '').trim();
+    label = input.label?.trim() || 'USDT TRC20';
+    active = input.active !== false;
+  }
+
   const entry: DepositAddress = {
     id: generateId('addr'),
     network: 'TRC20',
-    address: address.trim(),
-    label: label?.trim() || 'USDT TRC20',
-    active: setActive,
+    address,
+    label,
+    active,
     createdAt: new Date().toISOString(),
   };
   list.push(entry);
   await saveDepositAddresses(kv, list);
-  return entry;
+  return list;
 }
 
 export async function updateDepositAddress(
   kv: KVNamespace,
   id: string,
-  patch: Partial<Pick<DepositAddress, 'address' | 'label' | 'active'>>
+  patch: Partial<Pick<DepositAddress, 'address' | 'label' | 'active' | 'network'>>
 ): Promise<DepositAddress | null> {
   const list = await listDepositAddresses(kv);
   const idx = list.findIndex((a) => a.id === id);
