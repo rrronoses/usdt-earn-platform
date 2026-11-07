@@ -1,43 +1,69 @@
 'use client';
+
 import { useEffect, useState, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { UserNav } from '@/components/UserNav';
+import { useThemeLang } from '@/components/ThemeLangProvider';
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { t } = useThemeLang();
   const [data, setData] = useState<any>(null);
   const [depAmount, setDepAmount] = useState('');
   const [depInfo, setDepInfo] = useState<any>(null);
   const [msg, setMsg] = useState('');
   const [secondsLeft, setSecondsLeft] = useState(0);
-  const pollRef = useRef<any>(null);
-  const timerRef = useRef<any>(null);
+  const [claiming, setClaiming] = useState(false);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const loadMe = useCallback(() => {
-    return fetch('/api/me').then((r) => r.json()).then((d: any) => {
-      if (!d.ok) { router.push('/login'); return null; }
-      setData(d); return d;
-    }).catch(() => null);
+    return fetch('/api/me')
+      .then((r) => r.json())
+      .then((d: any) => {
+        if (!d.ok) {
+          router.push('/login');
+          return null;
+        }
+        setData(d);
+        return d;
+      })
+      .catch(() => null);
   }, [router]);
 
   useEffect(() => {
     loadMe();
-    return () => { if (pollRef.current) clearInterval(pollRef.current); if (timerRef.current) clearInterval(timerRef.current); };
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
   }, [loadMe]);
 
   function stopPolling() {
     if (pollRef.current) clearInterval(pollRef.current);
     if (timerRef.current) clearInterval(timerRef.current);
-    pollRef.current = null; timerRef.current = null;
+    pollRef.current = null;
+    timerRef.current = null;
   }
 
   function startPolling(depositId: string) {
     stopPolling();
     setSecondsLeft(240);
-    timerRef.current = setInterval(() => setSecondsLeft((s) => (s <= 1 ? (stopPolling(), 0) : s - 1)), 1000);
+    timerRef.current = setInterval(() => {
+      setSecondsLeft((s) => {
+        if (s <= 1) {
+          stopPolling();
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
     pollRef.current = setInterval(async () => {
       try {
-        const d: any = await fetch(`/api/deposit/check-status?depositId=${encodeURIComponent(depositId)}`).then((r) => r.json());
+        const d: any = await fetch(
+          `/api/deposit/check-status?depositId=${encodeURIComponent(depositId)}`
+        ).then((r) => r.json());
         if (d.ok && (d.credited || d.status === 'approved' || d.status === 'completed')) {
           stopPolling();
           setMsg(`Deposit confirmed! +${Number(d.creditedAmount || 0).toFixed(2)} USDT`);
@@ -50,11 +76,21 @@ export default function DashboardPage() {
 
   async function startDeposit() {
     const amount = parseFloat(depAmount);
-    if (!amount || amount <= 0) { setMsg('Enter valid amount'); return; }
-    const d: any = await fetch('/api/deposit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount }) }).then((r) => r.json());
+    if (!amount || amount <= 0) {
+      setMsg('Enter a valid amount');
+      return;
+    }
+    const d: any = await fetch('/api/deposit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount }),
+    }).then((r) => r.json());
     if (!d.ok) {
       setMsg(d.message || 'Failed');
-      if (d.depositId && d.address) { setDepInfo({ address: d.address, amount: d.amount || amount, depositId: d.depositId }); startPolling(d.depositId); }
+      if (d.depositId && d.address) {
+        setDepInfo({ address: d.address, amount: d.amount || amount, depositId: d.depositId });
+        startPolling(d.depositId);
+      }
       return;
     }
     setDepInfo({ address: d.address, amount: d.amount, depositId: d.depositId });
@@ -63,85 +99,228 @@ export default function DashboardPage() {
   }
 
   async function claim() {
+    setClaiming(true);
     const d: any = await fetch('/api/claim', { method: 'POST' }).then((r) => r.json());
     setMsg(d.message || (d.ok ? `Claimed ${d.claimed} USDT` : 'Claim failed'));
     if (d.ok) loadMe();
+    setClaiming(false);
   }
 
-  if (!data) return <div className="min-h-screen flex items-center justify-center bg-slate-950"><div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" /></div>;
+  if (!data) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-950">
+        <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   const { user, plans, transactions } = data;
   const mm = Math.floor(secondsLeft / 60);
   const ss = String(secondsLeft % 60).padStart(2, '0');
+  const activePlans = (plans || []).filter(
+    (p: any) => p.status === 'active' && new Date(p.expiryDate) > new Date()
+  );
 
   return (
-    <div className="min-h-screen bg-slate-950 pb-20">
-      <header className="border-b border-slate-800 sticky top-0 bg-slate-950/90 backdrop-blur z-40">
-        <div className="max-w-lg mx-auto px-4 h-14 flex items-center justify-between text-sm">
-          <span className="font-bold text-base">USDT Yield</span>
-          <div className="flex gap-3">
-            <Link href="/plans" className="text-slate-400 hover:text-white">Plans</Link>
-            <Link href="/invitation" className="text-slate-400 hover:text-white">Invite</Link>
-            <Link href="/account" className="text-slate-400 hover:text-white">Account</Link>
+    <div className="min-h-screen bg-slate-950 text-slate-100 pb-24 relative">
+      <div className="fixed inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute -top-24 right-0 w-72 h-72 bg-emerald-500/15 blur-[100px] rounded-full" />
+      </div>
+      <UserNav />
+      <main className="max-w-lg mx-auto px-4 py-5 space-y-4 relative z-10">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs text-slate-500">Welcome back</p>
+            <p className="font-bold text-lg">{user.username}</p>
           </div>
+          <Link
+            href="/plans"
+            className="text-xs font-semibold px-3 py-1.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+          >
+            Buy plan →
+          </Link>
         </div>
-      </header>
-      <main className="max-w-lg mx-auto px-4 py-6 space-y-5">
-        {msg && <div className="p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-sm text-center">{msg}</div>}
-        <div className="rounded-2xl bg-gradient-to-br from-emerald-600/30 to-teal-700/20 border border-emerald-500/30 p-5">
-          <p className="text-sm text-slate-300">Total Balance</p>
-          <p className="text-3xl font-extrabold">{user.totalBalance.toFixed(2)} <span className="text-lg text-emerald-300">USDT</span></p>
-          <div className="grid grid-cols-3 gap-3 mt-4">
-            <div className="bg-slate-900/40 rounded-xl p-3 text-center"><p className="text-xs text-slate-400">Deposit</p><p className="font-bold text-sm">{user.depositBalance.toFixed(2)}</p></div>
-            <div className="bg-slate-900/40 rounded-xl p-3 text-center"><p className="text-xs text-slate-400">Withdraw</p><p className="font-bold text-sm">{user.withdrawalBalance.toFixed(2)}</p></div>
-            <div className="bg-slate-900/40 rounded-xl p-3 text-center"><p className="text-xs text-slate-400">Today</p><p className="font-bold text-sm text-emerald-400">+{user.todayEarnings.toFixed(2)}</p></div>
+
+        {msg && (
+          <div className="p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-sm text-center">
+            {msg}
           </div>
-          <button onClick={claim} className="mt-4 w-full py-2.5 rounded-xl bg-emerald-500 text-slate-950 font-bold">Claim daily earnings</button>
+        )}
+
+        {/* Balances */}
+        <div className="rounded-3xl bg-gradient-to-br from-emerald-600/25 via-teal-700/15 to-slate-900 border border-emerald-500/30 p-5 shadow-lg shadow-emerald-500/10">
+          <p className="text-sm text-slate-300">{t.totalBalance}</p>
+          <p className="text-3xl sm:text-4xl font-black tracking-tight mt-1">
+            {user.totalBalance.toFixed(2)}
+            <span className="text-base font-semibold text-emerald-300 ml-1.5">USDT</span>
+          </p>
+          <div className="grid grid-cols-3 gap-2 mt-4">
+            <div className="bg-black/25 rounded-2xl p-3 text-center border border-white/5">
+              <p className="text-[10px] uppercase tracking-wide text-slate-400">{t.deposit}</p>
+              <p className="font-bold text-sm mt-0.5">{user.depositBalance.toFixed(2)}</p>
+            </div>
+            <div className="bg-black/25 rounded-2xl p-3 text-center border border-white/5">
+              <p className="text-[10px] uppercase tracking-wide text-slate-400">{t.withdraw}</p>
+              <p className="font-bold text-sm mt-0.5">{user.withdrawalBalance.toFixed(2)}</p>
+            </div>
+            <div className="bg-black/25 rounded-2xl p-3 text-center border border-white/5">
+              <p className="text-[10px] uppercase tracking-wide text-slate-400">{t.today}</p>
+              <p className="font-bold text-sm mt-0.5 text-emerald-400">+{user.todayEarnings.toFixed(2)}</p>
+            </div>
+          </div>
+          <button
+            onClick={claim}
+            disabled={claiming}
+            className="mt-4 w-full py-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-bold shadow-lg shadow-emerald-500/25 disabled:opacity-60"
+          >
+            {claiming ? 'Claiming…' : t.claim}
+          </button>
         </div>
-        <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-4 space-y-3">
-          <h2 className="font-semibold">Deposit USDT (TRC-20)</h2>
+
+        {/* Deposit */}
+        <div className="rounded-2xl border border-white/5 bg-slate-900/60 p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold">Deposit USDT (TRC-20)</h2>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">
+              TRC-20 only
+            </span>
+          </div>
           {!depInfo ? (
             <>
-              <input type="number" min="1" step="0.01" value={depAmount} onChange={(e) => setDepAmount(e.target.value)} placeholder="Amount" className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700" />
-              <button onClick={startDeposit} className="w-full py-2.5 rounded-xl bg-emerald-500 text-slate-950 font-bold">Generate address</button>
+              <input
+                type="number"
+                min="1"
+                step="0.01"
+                value={depAmount}
+                onChange={(e) => setDepAmount(e.target.value)}
+                placeholder="Amount in USDT"
+                className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-700 focus:border-emerald-500 outline-none"
+              />
+              <button
+                onClick={startDeposit}
+                className="w-full py-3 rounded-xl bg-emerald-500 text-slate-950 font-bold hover:bg-emerald-400 transition"
+              >
+                Generate deposit address
+              </button>
             </>
           ) : (
-            <>
-              <p className="text-sm text-amber-200">Send exactly <strong>{depInfo.amount} USDT</strong> on <strong>TRC-20</strong></p>
-              <img src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(depInfo.address)}`} alt="QR" className="mx-auto rounded-lg bg-white p-2" />
-              <div className="flex gap-2 items-center bg-slate-950 rounded-lg p-2">
-                <code className="text-xs break-all flex-1">{depInfo.address}</code>
-                <button type="button" onClick={() => navigator.clipboard.writeText(depInfo.address)} className="text-emerald-400 text-sm shrink-0">Copy</button>
+            <div className="space-y-3">
+              <p className="text-sm text-amber-200 text-center">
+                Send exactly <strong>{depInfo.amount} USDT</strong> on <strong>TRC-20</strong>
+              </p>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(depInfo.address)}`}
+                alt="QR"
+                className="mx-auto rounded-xl bg-white p-2"
+              />
+              <div className="flex gap-2 items-center bg-slate-950 rounded-xl p-3 border border-slate-800">
+                <code className="text-xs break-all flex-1 font-mono">{depInfo.address}</code>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(depInfo.address);
+                    setMsg('Address copied');
+                  }}
+                  className="text-emerald-400 text-sm font-semibold shrink-0"
+                >
+                  Copy
+                </button>
               </div>
-              {secondsLeft > 0 && <p className="text-center font-mono text-amber-400 text-lg">{mm}:{ss}</p>}
-              <button type="button" onClick={async () => {
-                const d: any = await fetch('/api/deposit/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ depositId: depInfo.depositId }) }).then((r) => r.json());
-                if (d.credited) { stopPolling(); setMsg(`Credited ${d.amount} USDT`); setDepInfo(null); loadMe(); }
-                else setMsg(d.reason || 'Not confirmed yet');
-              }} className="w-full py-2 rounded-lg bg-slate-700 text-sm">Check chain now</button>
-            </>
+              {secondsLeft > 0 && (
+                <p className="text-center font-mono text-2xl text-amber-400 tracking-widest">
+                  {mm}:{ss}
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={async () => {
+                  const d: any = await fetch('/api/deposit/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ depositId: depInfo.depositId }),
+                  }).then((r) => r.json());
+                  if (d.credited) {
+                    stopPolling();
+                    setMsg(`Credited ${d.amount} USDT`);
+                    setDepInfo(null);
+                    loadMe();
+                  } else setMsg(d.reason || 'Not confirmed on-chain yet');
+                }}
+                className="w-full py-2.5 rounded-xl bg-slate-700 text-sm font-medium hover:bg-slate-600"
+              >
+                Check chain now
+              </button>
+            </div>
           )}
         </div>
+
+        {/* Active plans */}
         <div>
-          <h2 className="font-semibold mb-2">Active plans</h2>
-          {(plans || []).length === 0 ? <p className="text-slate-500 text-sm">No plans — <Link href="/plans" className="text-emerald-400">browse</Link></p> : (
-            <div className="space-y-2">{(plans || []).map((p: any, i: number) => (
-              <div key={i} className="rounded-xl border border-slate-800 bg-slate-900/50 p-3 flex justify-between">
-                <div><p className="font-medium">{p.name}</p><p className="text-xs text-slate-400">{p.dailyYield}/day · {p.status}</p></div>
-                <span className="text-xs text-emerald-400">{p.status}</span>
-              </div>
-            ))}</div>
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="font-semibold">Active plans</h2>
+            <Link href="/plans" className="text-xs text-emerald-400">View all</Link>
+          </div>
+          {activePlans.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-700 p-6 text-center">
+              <p className="text-slate-500 text-sm mb-3">No active plans yet</p>
+              <Link
+                href="/plans"
+                className="inline-flex px-4 py-2 rounded-xl bg-emerald-500 text-slate-950 text-sm font-bold"
+              >
+                Browse plans
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {activePlans.map((p: any) => (
+                <div
+                  key={p.userPlanId || p.planId}
+                  className="rounded-2xl border border-white/5 bg-slate-900/60 p-3.5 flex justify-between items-center"
+                >
+                  <div>
+                    <p className="font-semibold">{p.name}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {p.dailyYield} USDT/day · expires {new Date(p.expiryDate).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <span className="text-[10px] uppercase tracking-wide px-2 py-1 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                    {p.status}
+                  </span>
+                </div>
+              ))}
+            </div>
           )}
         </div>
+
+        {/* Recent txs */}
         <div>
-          <h2 className="font-semibold mb-2">Recent transactions</h2>
-          <div className="rounded-xl border border-slate-800 divide-y divide-slate-800">
-            {(transactions || []).slice(0, 8).map((t: any) => (
-              <div key={t.id} className="px-3 py-2 flex justify-between text-sm">
-                <div><p>{t.description}</p><p className="text-xs text-slate-500">{new Date(t.timestamp).toLocaleString()} · {t.status}</p></div>
-                <span className={t.amount >= 0 ? 'text-emerald-400' : 'text-red-400'}>{t.amount >= 0 ? '+' : ''}{t.amount.toFixed(2)}</span>
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="font-semibold">Recent transactions</h2>
+            <Link href="/account" className="text-xs text-emerald-400">Full history</Link>
+          </div>
+          <div className="rounded-2xl border border-white/5 bg-slate-900/40 divide-y divide-white/5 overflow-hidden">
+            {(transactions || []).slice(0, 8).map((tx: any) => (
+              <div key={tx.id} className="px-3.5 py-3 flex justify-between gap-3 text-sm">
+                <div className="min-w-0">
+                  <p className="truncate">{tx.description}</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    {new Date(tx.timestamp).toLocaleString()} · {tx.status}
+                  </p>
+                </div>
+                <span
+                  className={`font-mono shrink-0 font-semibold ${
+                    tx.amount >= 0 ? 'text-emerald-400' : 'text-red-400'
+                  }`}
+                >
+                  {tx.amount >= 0 ? '+' : ''}
+                  {Number(tx.amount).toFixed(2)}
+                </span>
               </div>
             ))}
+            {(transactions || []).length === 0 && (
+              <p className="p-4 text-center text-slate-500 text-sm">No transactions yet</p>
+            )}
           </div>
         </div>
       </main>
