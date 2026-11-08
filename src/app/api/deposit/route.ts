@@ -12,7 +12,9 @@ import {
   generateId,
 } from '@/lib/kv';
 import { getUserToken, parseToken } from '@/lib/auth';
+import { rateLimit } from '@/lib/rate-limit';
 import type { DepositRequest, DepositWatch, Transaction } from '@/types';
+import type { DepositCreateRequest } from '@/lib/api-types';
 
 export const runtime = 'edge';
 
@@ -20,16 +22,36 @@ export async function POST(req: Request) {
   const token = getUserToken();
   if (!token) return NextResponse.json({ ok: false, message: 'Unauthorized' }, { status: 401 });
   const parsed = parseToken(token);
-  if (!parsed) return NextResponse.json({ ok: false, message: 'Unauthorized' }, { status: 401 });
-
-  const body: any = await req.json().catch(() => ({}));
-  const amount = Number(body.amount);
-  if (!amount || amount <= 0) {
-    return NextResponse.json({ ok: false, message: 'Invalid amount' }, { status: 400 });
+  if (!parsed || parsed.role !== 'user') {
+    return NextResponse.json({ ok: false, message: 'Unauthorized' }, { status: 401 });
   }
 
   const kv = getStorage();
   await ensureSeeded(kv);
+
+  const rl = await rateLimit(kv, `deposit:create:${parsed.userId}`, {
+    limit: 8,
+    windowSec: 60,
+  });
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { ok: false, message: `Too many deposit requests. Retry in ${rl.retryAfterSec}s` },
+      { status: 429 }
+    );
+  }
+
+  let body: DepositCreateRequest;
+  try {
+    body = (await req.json()) as DepositCreateRequest;
+  } catch {
+    return NextResponse.json({ ok: false, message: 'Invalid JSON body' }, { status: 400 });
+  }
+
+  const amount = Number(body.amount);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return NextResponse.json({ ok: false, message: 'Invalid amount' }, { status: 400 });
+  }
+
   const user = await getUser(kv, parsed.userId);
   if (!user) return NextResponse.json({ ok: false, message: 'User not found' }, { status: 404 });
   if (user.status === 'banned') {
@@ -112,6 +134,6 @@ export async function POST(req: Request) {
     contract: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
     amount,
     message:
-      'Send exact USDT TRC-20 to this address (randomly assigned from admin pool). Balance credits after on-chain confirmation.',
+      'Send exact USDT TRC-20 to this address. Balance credits after on-chain confirmation.',
   });
 }

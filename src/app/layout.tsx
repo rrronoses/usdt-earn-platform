@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { ThemeLangProvider } from '@/components/ThemeLangProvider';
+import { ToastProvider } from '@/components/Toast';
 
 export const metadata: Metadata = {
   title: 'USDT Earn — Daily USDT Yield Plans',
@@ -26,7 +27,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <body className="min-h-screen antialiased mesh-bg bg-slate-950 text-slate-100">
-        <ThemeLangProvider>{children}</ThemeLangProvider>
+        <ThemeLangProvider>
+          <ToastProvider>{children}</ToastProvider>
+        </ThemeLangProvider>
       </body>
     </html>
   );

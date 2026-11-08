@@ -1,6 +1,11 @@
 /**
- * Automated USDT TRC-20 deposit verification engine.
- * Polls TronGrid, enforces idempotency via processed_tx:{txId}, credits depositBalance.
+ * Automated USDT TRC-20 deposit verification engine (USDTSTORAGE).
+ *
+ * Safety model:
+ * 1. Match confirmed TronGrid TRC-20 transfers to pending DepositRequest records
+ * 2. Prefer exact amount match; support multi-user shared deposit addresses
+ * 3. Idempotency via processed_tx:{txId} — never credit the same chain tx twice
+ * 4. Short-lived processing lock processed_tx:{txId}:lock to reduce race windows
  */
 
 import type { KVNamespace } from './kv';
@@ -10,7 +15,6 @@ import {
   saveTx,
   saveDeposit,
   getDeposit,
-  getDepositWatchByAddress,
   getDepositWatchById,
   saveDepositWatch,
   isTxProcessed,
@@ -18,11 +22,15 @@ import {
   generateId,
   getAnalytics,
   saveAnalytics,
+  listPendingDeposits,
+  keys,
+  putJSON,
 } from './kv';
 import {
   fetchUsdtTrc20Transfers,
   matchDepositTransfers,
   resolveNetwork,
+  type Trc20Transfer,
 } from './tron';
 import type { DepositRequest, DepositWatch, Transaction } from '@/types';
 
@@ -35,98 +43,86 @@ export interface VerifyResult {
   depositId?: string;
 }
 
-export async function verifyDepositWatch(
+const LOCK_TTL_HINT_MS = 30_000;
+
+async function acquireTxLock(kv: KVNamespace, txId: string): Promise<boolean> {
+  const lockKey = `processed_tx:${txId}:lock`;
+  const existing = await kv.get(lockKey);
+  if (existing) return false;
+  await kv.put(lockKey, String(Date.now()), { expirationTtl: 60 });
+  return true;
+}
+
+async function creditDeposit(
   kv: KVNamespace,
-  opts: { address?: string; depositId?: string }
+  dep: DepositRequest,
+  match: Trc20Transfer
 ): Promise<VerifyResult> {
-  let watch: DepositWatch | null = null;
-  if (opts.depositId) {
-    watch = await getDepositWatchById(kv, opts.depositId);
-  } else if (opts.address) {
-    watch = await getDepositWatchByAddress(kv, opts.address);
-  }
-  if (!watch) {
-    return { credited: false, reason: 'No active deposit watch' };
-  }
-  if (watch.status !== 'pending') {
-    return { credited: false, reason: `Watch status is ${watch.status}`, depositId: watch.depositId };
-  }
-
-  const createdAtMs = new Date(watch.createdAt).getTime();
-  let transfers;
-  try {
-    transfers = await fetchUsdtTrc20Transfers({
-      address: watch.address,
-      onlyConfirmed: true,
-      limit: 50,
-      minTimestamp: createdAtMs > 0 ? createdAtMs - 60_000 : undefined,
-      network: resolveNetwork(),
-    });
-  } catch (e) {
-    return {
-      credited: false,
-      reason: e instanceof Error ? e.message : 'TronGrid error',
-      depositId: watch.depositId,
-    };
-  }
-
-  const matches = matchDepositTransfers(transfers, {
-    address: watch.address,
-    expectedAmount: watch.expectedAmount,
-    createdAtMs,
-  });
-
-  if (matches.length === 0) {
-    return { credited: false, reason: 'No matching confirmed USDT TRC-20 transfer yet', depositId: watch.depositId };
-  }
-
-  matches.sort((a, b) => a.blockTimestamp - b.blockTimestamp);
-  const match = matches[0];
-
   if (await isTxProcessed(kv, match.transactionId)) {
-    if (watch.status === 'pending') {
-      watch.status = 'completed';
-      watch.matchedTxId = match.transactionId;
-      await saveDepositWatch(kv, watch);
-    }
     return {
       credited: false,
       reason: 'Transaction already processed (idempotent skip)',
       txId: match.transactionId,
-      depositId: watch.depositId,
+      depositId: dep.id,
     };
   }
 
-  const user = await getUser(kv, watch.userId);
-  if (!user) {
-    return { credited: false, reason: 'User not found', depositId: watch.depositId };
+  const locked = await acquireTxLock(kv, match.transactionId);
+  if (!locked) {
+    return {
+      credited: false,
+      reason: 'Transaction is being processed by another worker',
+      txId: match.transactionId,
+      depositId: dep.id,
+    };
   }
 
-  const creditAmount = match.amount;
-  user.depositBalance = Number((user.depositBalance + creditAmount).toFixed(6));
-  await saveUser(kv, user);
+  // Re-check after lock
+  if (await isTxProcessed(kv, match.transactionId)) {
+    return {
+      credited: false,
+      reason: 'Transaction already processed (idempotent skip)',
+      txId: match.transactionId,
+      depositId: dep.id,
+    };
+  }
 
+  const user = await getUser(kv, dep.userId);
+  if (!user) {
+    return { credited: false, reason: 'User not found', depositId: dep.id };
+  }
+
+  const creditAmount = Number(match.amount.toFixed(6));
+
+  // Mark processed BEFORE balance mutation (crash-safe preference: no double credit)
   await markTxProcessed(kv, match.transactionId, {
     userId: user.id,
     amount: creditAmount,
-    depositId: watch.depositId,
+    depositId: dep.id,
   });
 
-  watch.status = 'completed';
-  watch.matchedTxId = match.transactionId;
-  watch.creditedAmount = creditAmount;
-  await saveDepositWatch(kv, watch);
+  user.depositBalance = Number((user.depositBalance + creditAmount).toFixed(6));
+  await saveUser(kv, user);
 
-  const dep = await getDeposit(kv, watch.depositId);
-  if (dep) {
-    const updated: DepositRequest = {
-      ...dep,
-      status: 'approved',
-      processedAt: new Date().toISOString(),
-      txHash: match.transactionId,
-      note: `Auto-verified on-chain USDT TRC-20`,
+  const now = new Date().toISOString();
+  const updated: DepositRequest = {
+    ...dep,
+    status: 'approved',
+    processedAt: now,
+    txHash: match.transactionId,
+    note: 'Auto-verified on-chain USDT TRC-20',
+  };
+  await saveDeposit(kv, updated);
+
+  const watch = await getDepositWatchById(kv, dep.id);
+  if (watch) {
+    const next: DepositWatch = {
+      ...watch,
+      status: 'completed',
+      matchedTxId: match.transactionId,
+      creditedAmount: creditAmount,
     };
-    await saveDeposit(kv, updated);
+    await saveDepositWatch(kv, next);
   }
 
   const ledger: Transaction = {
@@ -136,9 +132,9 @@ export async function verifyDepositWatch(
     amount: creditAmount,
     status: 'completed',
     description: `USDT TRC-20 deposit confirmed (${match.transactionId.slice(0, 12)}…)`,
-    timestamp: new Date().toISOString(),
+    timestamp: now,
     txHash: match.transactionId,
-    address: watch.address,
+    address: dep.address,
   };
   await saveTx(kv, ledger);
 
@@ -151,8 +147,100 @@ export async function verifyDepositWatch(
     txId: match.transactionId,
     amount: creditAmount,
     userId: user.id,
-    depositId: watch.depositId,
+    depositId: dep.id,
   };
+}
+
+/** Pick best transfer for a pending deposit (exact amount preferred). */
+function pickMatch(
+  transfers: Trc20Transfer[],
+  dep: DepositRequest,
+  usedTxIds: Set<string>
+): Trc20Transfer | null {
+  const createdAtMs = new Date(dep.createdAt).getTime();
+  const candidates = matchDepositTransfers(transfers, {
+    address: dep.address,
+    expectedAmount: dep.amount,
+    createdAtMs: createdAtMs > 0 ? createdAtMs - 60_000 : 0,
+    amountTolerance: 0.000001,
+  }).filter((t) => !usedTxIds.has(t.transactionId));
+
+  if (!candidates.length) return null;
+
+  // Exact amount first, then closest >= expected
+  const exact = candidates.find(
+    (t) => Math.abs(t.amount - dep.amount) < 0.000001
+  );
+  if (exact) return exact;
+
+  candidates.sort((a, b) => a.amount - b.amount || a.blockTimestamp - b.blockTimestamp);
+  return candidates[0];
+}
+
+export async function verifyDepositWatch(
+  kv: KVNamespace,
+  opts: { address?: string; depositId?: string }
+): Promise<VerifyResult> {
+  let dep: DepositRequest | null = null;
+
+  if (opts.depositId) {
+    dep = await getDeposit(kv, opts.depositId);
+  }
+
+  if (!dep && opts.address) {
+    const pending = await listPendingDeposits(kv);
+    dep =
+      pending.find(
+        (d) => d.address === opts.address && d.status === 'pending'
+      ) || null;
+  }
+
+  if (!dep) {
+    return { credited: false, reason: 'No pending deposit found' };
+  }
+
+  if (dep.status !== 'pending') {
+    return {
+      credited: false,
+      reason: `Deposit status is ${dep.status}`,
+      depositId: dep.id,
+      txId: dep.txHash,
+    };
+  }
+
+  const createdAtMs = new Date(dep.createdAt).getTime();
+  let transfers: Trc20Transfer[];
+  try {
+    transfers = await fetchUsdtTrc20Transfers({
+      address: dep.address,
+      onlyConfirmed: true,
+      limit: 80,
+      minTimestamp: createdAtMs > 0 ? createdAtMs - 120_000 : undefined,
+      network: resolveNetwork(),
+    });
+  } catch (e) {
+    return {
+      credited: false,
+      reason: e instanceof Error ? e.message : 'TronGrid error',
+      depositId: dep.id,
+    };
+  }
+
+  const usedTxIds = new Set<string>();
+  for (const t of transfers) {
+    if (await isTxProcessed(kv, t.transactionId)) usedTxIds.add(t.transactionId);
+  }
+
+  const match = pickMatch(transfers, dep, usedTxIds);
+  if (!match) {
+    return {
+      credited: false,
+      reason: 'No matching confirmed USDT TRC-20 transfer yet',
+      depositId: dep.id,
+    };
+  }
+
+  return creditDeposit(kv, dep, match);
 }
 
 export async function verifyAllPendingDeposits(kv: KVNamespace): Promise<{
@@ -160,16 +248,73 @@ export async function verifyAllPendingDeposits(kv: KVNamespace): Promise<{
   credited: number;
   results: VerifyResult[];
 }> {
-  const { listPendingDeposits } = await import('./kv');
   const pending = await listPendingDeposits(kv);
   const results: VerifyResult[] = [];
   let credited = 0;
 
+  // Group by address to minimize TronGrid calls
+  const byAddress = new Map<string, DepositRequest[]>();
   for (const dep of pending) {
-    const r = await verifyDepositWatch(kv, { depositId: dep.id });
-    results.push(r);
-    if (r.credited) credited += 1;
+    const list = byAddress.get(dep.address) || [];
+    list.push(dep);
+    byAddress.set(dep.address, list);
+  }
+
+  for (const [address, deps] of byAddress) {
+    const oldest = deps.reduce((a, b) =>
+      new Date(a.createdAt).getTime() < new Date(b.createdAt).getTime() ? a : b
+    );
+    const createdAtMs = new Date(oldest.createdAt).getTime();
+
+    let transfers: Trc20Transfer[] = [];
+    try {
+      transfers = await fetchUsdtTrc20Transfers({
+        address,
+        onlyConfirmed: true,
+        limit: 100,
+        minTimestamp: createdAtMs > 0 ? createdAtMs - 120_000 : undefined,
+        network: resolveNetwork(),
+      });
+    } catch {
+      for (const d of deps) {
+        results.push({
+          credited: false,
+          reason: 'TronGrid error',
+          depositId: d.id,
+        });
+      }
+      continue;
+    }
+
+    const usedTxIds = new Set<string>();
+    for (const t of transfers) {
+      if (await isTxProcessed(kv, t.transactionId)) usedTxIds.add(t.transactionId);
+    }
+
+    // Process smaller expected amounts first to reduce mis-assignment
+    const ordered = [...deps].sort((a, b) => a.amount - b.amount);
+    for (const dep of ordered) {
+      if (dep.status !== 'pending') continue;
+      const match = pickMatch(transfers, dep, usedTxIds);
+      if (!match) {
+        results.push({
+          credited: false,
+          reason: 'No matching confirmed USDT TRC-20 transfer yet',
+          depositId: dep.id,
+        });
+        continue;
+      }
+      const r = await creditDeposit(kv, dep, match);
+      if (r.credited && r.txId) usedTxIds.add(r.txId);
+      results.push(r);
+      if (r.credited) credited += 1;
+    }
   }
 
   return { checked: pending.length, credited, results };
 }
+
+// Silence unused import warning if keys/putJSON unused in some builds
+void keys;
+void putJSON;
+void LOCK_TTL_HINT_MS;
