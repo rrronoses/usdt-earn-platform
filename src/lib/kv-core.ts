@@ -48,12 +48,10 @@ export async function putJSON(kv: KVNamespace, key: string, value: unknown) {
   await kv.put(key, JSON.stringify(value));
 }
 
-/** Read index value that may be raw string or JSON-quoted string (legacy). */
 async function getIndexId(kv: KVNamespace, key: string): Promise<string | null> {
   const raw = await kv.get(key);
   if (!raw) return null;
   const trimmed = raw.trim();
-  // Legacy bug: putJSON stored "\"12345678\"" or "\"12345678\""
   if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
     try {
       const parsed = JSON.parse(trimmed);
@@ -97,13 +95,11 @@ export async function getUserByUsername(kv: KVNamespace, username: string) {
     const u = await getUser(kv, id);
     if (u) return u;
   }
-  // Fallback scan for older accounts without username index
   const users = await listUsers(kv, 500);
   const lower = username.toLowerCase();
   return users.find((u) => u.username.toLowerCase() === lower) || null;
 }
 
-/** Resolve login identifier: email or username */
 export async function getUserByLogin(kv: KVNamespace, login: string) {
   const q = login.trim();
   if (!q) return null;
@@ -112,15 +108,41 @@ export async function getUserByLogin(kv: KVNamespace, login: string) {
   }
   const byUser = await getUserByUsername(kv, q);
   if (byUser) return byUser;
-  // Also try email path in case someone typed email without @ somehow
   return getUserByEmail(kv, q.toLowerCase());
 }
 
 export async function saveUser(kv: KVNamespace, user: User) {
   await putJSON(kv, keys.user(user.id), user);
-  // Store indexes as RAW strings (not JSON) so get() returns the id directly
   await kv.put(keys.email(user.email), user.id);
   await kv.put(keys.username(user.username), user.id);
+}
+
+/** Permanently remove user profile + login indexes + plan list. Ledger txs kept for audit. */
+export async function deleteUser(kv: KVNamespace, userId: string): Promise<boolean> {
+  const user = await getUser(kv, userId);
+  if (!user) {
+    // Still try delete key in case of partial state
+    await kv.delete(keys.user(userId));
+    await kv.delete(keys.userPlans(userId));
+    return false;
+  }
+
+  await kv.delete(keys.email(user.email));
+  await kv.delete(keys.username(user.username));
+  // Also clear possible deleted_* email from soft-delete attempts
+  await kv.delete(keys.email(`deleted_${user.id}@removed.local`));
+
+  await kv.delete(keys.user(userId));
+  await kv.delete(keys.userPlans(userId));
+  // Keep user_tx index + tx records for audit trail
+
+  const analytics = await getAnalytics(kv);
+  if (analytics.totalUsers > 0) {
+    analytics.totalUsers -= 1;
+    await saveAnalytics(kv, analytics);
+  }
+
+  return true;
 }
 
 export async function listUsers(kv: KVNamespace, limit = 200): Promise<User[]> {
