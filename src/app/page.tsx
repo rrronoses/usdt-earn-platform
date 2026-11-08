@@ -56,12 +56,15 @@ export default function HomePage() {
             <a href="#plans" className="hover:text-white transition">
               {t.plans}
             </a>
+            <Link href="/calculator" className="hover:text-white transition">
+              Calculator
+            </Link>
             <a href="#how" className="hover:text-white transition">
               How it works
             </a>
-            <a href="#features" className="hover:text-white transition">
-              Features
-            </a>
+            <Link href="/faq" className="hover:text-white transition">
+              FAQ
+            </Link>
           </nav>
           <div className="flex items-center gap-2 sm:gap-3">
             <ThemeLangToggles />
@@ -119,7 +122,10 @@ export default function HomePage() {
         <div className="text-center mb-10">
           <h2 className="text-3xl sm:text-4xl font-extrabold mb-3">{t.plans}</h2>
           <p className="text-slate-400 max-w-xl mx-auto">
-            Clear prices. Daily claims. Higher tiers unlock more USDT every day.
+            Clear prices. Daily claims. Higher tiers unlock more USDT every day.{' '}
+            <Link href="/calculator" className="text-emerald-400 hover:underline">
+              Try the calculator
+            </Link>
           </p>
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-5">
@@ -144,9 +150,7 @@ export default function HomePage() {
                     <h3 className="font-bold text-xl">{p.name}</h3>
                     <p className="text-xs text-slate-400 mt-0.5">{p.note}</p>
                   </div>
-                  {p.price > 3 && (
-                    <Badge tone="info">{roi}% cycle</Badge>
-                  )}
+                  {p.price > 3 && <Badge tone="info">{roi}% cycle</Badge>}
                 </div>
                 <p className="mt-5 text-4xl font-black tracking-tight">
                   {p.price}
@@ -154,21 +158,15 @@ export default function HomePage() {
                 </p>
                 <ul className="mt-5 space-y-2.5 text-sm text-slate-300">
                   <li className="flex items-center gap-2">
-                    <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs">
-                      ✓
-                    </span>
+                    <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs">✓</span>
                     {p.days} days duration
                   </li>
                   <li className="flex items-center gap-2">
-                    <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs">
-                      ✓
-                    </span>
+                    <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs">✓</span>
                     <strong className="text-emerald-300">{p.daily} USDT</strong> daily claim
                   </li>
                   <li className="flex items-center gap-2">
-                    <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs">
-                      ✓
-                    </span>
+                    <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs">✓</span>
                     Up to <strong className="text-white">{p.total} USDT</strong> total yield
                   </li>
                 </ul>
@@ -218,9 +216,7 @@ export default function HomePage() {
               { title: 'Fast withdrawals', desc: 'Request anytime. Admin review in 2–3 hours.' },
             ].map((f) => (
               <div key={f.title} className="flex gap-4 rounded-2xl bg-black/20 border border-white/5 p-5">
-                <div className="w-11 h-11 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-400 font-bold shrink-0">
-                  ◆
-                </div>
+                <div className="w-11 h-11 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-400 font-bold shrink-0">◆</div>
                 <div>
                   <h3 className="font-bold">{f.title}</h3>
                   <p className="text-sm text-slate-400 mt-1">{f.desc}</p>
@@ -250,11 +246,16 @@ export default function HomePage() {
       </section>
 
       <footer className="relative z-10 border-t border-white/5 py-10 text-center text-slate-500 text-sm">
-        <div className="flex items-center justify-center gap-2 font-bold text-slate-300 mb-2">
-          <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center text-white text-sm">
-            ₮
-          </span>
+        <div className="flex items-center justify-center gap-2 font-bold text-slate-300 mb-4">
+          <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center text-white text-sm">₮</span>
           USDT<span className="text-emerald-400">Earn</span>
+        </div>
+        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs mb-4">
+          <Link href="/calculator" className="hover:text-emerald-400">Calculator</Link>
+          <Link href="/faq" className="hover:text-emerald-400">FAQ</Link>
+          <Link href="/support" className="hover:text-emerald-400">Support</Link>
+          <Link href="/terms" className="hover:text-emerald-400">Terms</Link>
+          <Link href="/privacy" className="hover:text-emerald-400">Privacy</Link>
         </div>
         <p className="text-xs text-slate-600">© {new Date().getFullYear()} USDT Earn</p>
       </footer>
