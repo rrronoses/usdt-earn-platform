@@ -14,6 +14,18 @@ import { log } from '@/lib/logger';
 
 export const runtime = 'edge';
 
+/** Admin credentials: Cloudflare Pages env vars first, then system config, then safe defaults. */
+function resolveAdminCredentials(cfg: { adminUsername?: string; adminPasswordHash?: string }) {
+  const envUser = (process.env.ADMIN_USERNAME || '').trim();
+  const envPass = process.env.ADMIN_PASSWORD || '';
+
+  const username = envUser || cfg.adminUsername || 'admin';
+  // Prefer env password; else KV config (plain or hashed); else empty (must set env in production)
+  const passwordPlain = envPass || (cfg.adminPasswordHash || '');
+
+  return { username, passwordPlain, fromEnv: Boolean(envUser || envPass) };
+}
+
 export async function POST(req: Request) {
   const parsedBody = await parseJson(req, loginSchema);
   if (!parsedBody.ok) return withSecurityHeaders(parsedBody.response);
@@ -39,20 +51,29 @@ export async function POST(req: Request) {
     if (asAdmin) {
       const cfg = await getConfig(kv);
       const username = String(parsedBody.data.username || login || '').trim();
-      const ok =
-        username === cfg.adminUsername &&
-        (password === cfg.adminPasswordHash ||
-          verifyPassword(password, cfg.adminPasswordHash) ||
-          hashPassword(password) === cfg.adminPasswordHash);
-      const demoOk = username === 'admin' && password === 'admin123';
-      if (!ok && !demoOk) {
+      const creds = resolveAdminCredentials(cfg);
+
+      const userMatch = username.toLowerCase() === creds.username.toLowerCase();
+      const passMatch =
+        password === creds.passwordPlain ||
+        verifyPassword(password, creds.passwordPlain) ||
+        hashPassword(password) === creds.passwordPlain;
+
+      // Legacy demo only if ADMIN_PASSWORD is not set in env
+      const demoOk =
+        !process.env.ADMIN_PASSWORD &&
+        username === 'admin' &&
+        password === 'admin123';
+
+      if (!(userMatch && passMatch) && !demoOk) {
         log.warn('auth.admin.fail', { username });
         return withSecurityHeaders(jsonError('UNAUTHORIZED', 'Invalid admin credentials'));
       }
+
       const token = createToken('admin', 'admin');
       const res = jsonOk({ role: 'admin' as const });
       res.cookies.set(adminCookieOptions(token));
-      log.info('auth.admin.ok', { username });
+      log.info('auth.admin.ok', { username, fromEnv: creds.fromEnv });
       return withSecurityHeaders(res);
     }
 
