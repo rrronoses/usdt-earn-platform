@@ -246,7 +246,11 @@ export async function verifyAllPendingDeposits(kv: KVNamespace): Promise<{
     byAddress.set(dep.address, list);
   }
 
-  for (const [address, deps] of byAddress) {
+  // Array.from avoids TS downlevelIteration requirement on Map iterators
+  const groups = Array.from(byAddress.entries());
+  for (let i = 0; i < groups.length; i += 1) {
+    const address = groups[i][0];
+    const deps = groups[i][1];
     const oldest = deps.reduce((a, b) =>
       new Date(a.createdAt).getTime() < new Date(b.createdAt).getTime() ? a : b
     );
@@ -273,7 +277,7 @@ export async function verifyAllPendingDeposits(kv: KVNamespace): Promise<{
       if (await isTxProcessed(kv, t.transactionId)) usedTxIds.add(t.transactionId);
     }
 
-    const ordered = [...deps].sort((a, b) => a.amount - b.amount);
+    const ordered = deps.slice().sort((a, b) => a.amount - b.amount);
     for (const dep of ordered) {
       if (dep.status !== 'pending') continue;
       const match = pickMatch(transfers, dep, usedTxIds);
