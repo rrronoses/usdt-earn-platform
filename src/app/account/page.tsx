@@ -41,7 +41,10 @@ export default function AccountPage() {
         setUser(d.user);
         setTransactions(d.transactions || []);
         setMinW(d.config?.minWithdrawalLimit ?? 25);
-        setNote(d.config?.withdrawalNote || 'Withdrawal is received in 2–3 hours after admin approval.');
+        setNote(
+          d.config?.withdrawalNote ||
+            'Withdrawal is received in 2-3 hours after admin approval.'
+        );
       });
   }, [router]);
 
@@ -76,7 +79,7 @@ export default function AccountPage() {
     setBusy(false);
   }
 
-  async function changePassword() {
+  function changePassword() {
     if (newPass.length < 6) {
       setMsg('New password must be at least 6 characters');\n      return;
     }
@@ -117,7 +120,11 @@ export default function AccountPage() {
 
         <div className="rounded-3xl border border-white/5 bg-gradient-to-br from-slate-900 to-slate-950 p-5 flex items-center gap-4">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={avatar} alt="" className="w-16 h-16 rounded-2xl bg-slate-800 ring-2 ring-emerald-500/30" />
+          <img
+            src={avatar}
+            alt=""
+            className="w-16 h-16 rounded-2xl bg-slate-800 ring-2 ring-emerald-500/30"
+          />
           <div className="min-w-0 flex-1">
             <p className="font-bold text-lg truncate">{user.username}</p>
             <p className="text-sm text-slate-400 truncate">{user.email}</p>
@@ -143,7 +150,9 @@ export default function AccountPage() {
           <h2 className="font-semibold text-lg">{t.withdraw}</h2>
           <div className="rounded-xl bg-black/30 border border-white/5 p-3 flex justify-between text-sm">
             <span className="text-slate-400">Available</span>
-            <span className="font-bold text-emerald-400">{user.withdrawalBalance.toFixed(2)} USDT</span>
+            <span className="font-bold text-emerald-400">
+              {user.withdrawalBalance.toFixed(2)} USDT
+            </span>
           </div>
           <p className="text-xs text-slate-500">
             Minimum: <strong className="text-slate-300">{minW} USDT</strong>. {note}
@@ -158,7 +167,7 @@ export default function AccountPage() {
           <input
             value={address}
             onChange={(e) => setAddress(e.target.value)}
-            placeholder="Your USDT TRC-20 address (T…)"
+            placeholder="Your USDT TRC-20 address (T...)"
             className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-700 font-mono text-sm focus:border-emerald-500 outline-none"
           />
           <button
@@ -166,7 +175,7 @@ export default function AccountPage() {
             disabled={busy}
             className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-bold disabled:opacity-60 shadow-lg shadow-emerald-500/20"
           >
-            {busy ? 'Submitting…' : 'Request withdraw'}
+            {busy ? 'Submitting...' : 'Request withdraw'}
           </button>
         </div>
 
@@ -182,7 +191,9 @@ export default function AccountPage() {
                 <div key={tx.id} className="px-4 py-2.5 flex justify-between text-sm gap-2">
                   <div>
                     <p className="font-medium">{tx.amount} USDT</p>
-                    <p className="text-[11px] text-slate-500">{new Date(tx.timestamp).toLocaleString()}</p>
+                    <p className="text-[11px] text-slate-500">
+                      {new Date(tx.timestamp).toLocaleString()}
+                    </p>
                   </div>
                   <span
                     className={`text-xs font-semibold capitalize self-center ${
@@ -210,13 +221,20 @@ export default function AccountPage() {
               className="text-xs px-2 py-1.5 rounded-lg bg-slate-950 border border-slate-700"
             >
               <option value="">All types</option>
-              {['deposit', 'withdrawal', 'yield', 'referral', 'plan_purchase', 'signup_bonus', 'admin_add', 'admin_sub'].map(
-                (type) => (
-                  <option key={type} value={type}>
-                    {txTypeLabel(type)}
-                  </option>
-                )
-              )}
+              {[
+                'deposit',
+                'withdrawal',
+                'yield',
+                'referral',
+                'plan_purchase',
+                'signup_bonus',
+                'admin_add',
+                'admin_sub',
+              ].map((type) => (
+                <option key={type} value={type}>
+                  {txTypeLabel(type)}
+                </option>
+              ))}
             </select>
           </div>
           <div className="divide-y divide-white/5 max-h-72 overflow-y-auto">
@@ -225,10 +243,15 @@ export default function AccountPage() {
                 <div className="min-w-0">
                   <p className="truncate">{tx.description}</p>
                   <p className="text-[11px] text-slate-500">
-                    {txTypeLabel(tx.type)} · {tx.status} · {new Date(tx.timestamp).toLocaleString()}
+                    {txTypeLabel(tx.type)} · {tx.status} ·{' '}
+                    {new Date(tx.timestamp).toLocaleString()}
                   </p>
                 </div>
-                <span className={`font-mono shrink-0 ${tx.amount >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                <span
+                  className={`font-mono shrink-0 ${
+                    tx.amount >= 0 ? 'text-emerald-400' : 'text-red-400'
+                  }`}
+                >
                   {tx.amount >= 0 ? '+' : ''}
                   {Number(tx.amount).toFixed(2)}
                 </span>
