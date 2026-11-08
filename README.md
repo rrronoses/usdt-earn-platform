@@ -1,34 +1,25 @@
-# USDT Yield Platform
+# USDT Earn
 
 Next.js 14 · Cloudflare Pages · KV **USDTSTORAGE** · USDT TRC-20 deposits
 
-## Cloudflare Pages build settings (no local PC needed)
+Live: https://usdtearn.pages.dev/
+
+## Cloudflare Pages build settings
 
 | Setting | Value |
-|---------|--------|
-| Framework preset | None / Next.js |
-| **Build command** | `npx @cloudflare/next-on-pages@1.13.16` |
-| **Build output directory** | `.vercel/output/static` |
-| Node version | 20 (`NODE_VERSION=20` env) |
-| Production branch | `main` |
+|--------|--------|
+| Framework preset | None |
+| Build command | `npx @cloudflare/next-on-pages@1.13.16` |
+| Build output | `.vercel/output/static` |
+| Node | 18+ |
 
-### Bindings (Pages → Settings → Functions)
+## Bindings
 
-- **KV namespace binding** name: `USDTSTORAGE` → your KV namespace
+- KV: `USDTSTORAGE`
 
-### Environment variables
+## Env vars
 
-- `TRON_PRO_API_KEY` — TronGrid API key
-- `TRON_NETWORK` — `mainnet` or `shasta`
-- `CRON_SECRET` — random secret for verify cron
-- `NODE_VERSION` — `20`
-
-### After deploy
-
-1. Open `https://YOUR-PROJECT.pages.dev/administrator`
-2. Login `admin` / `admin123`
-3. **Deposits** → add USDT TRC-20 addresses (`T…`)
-4. **Settings** → min withdrawal / deposit limits
-
-Admin: `/administrator`  
-User: `/signup` · `/dashboard`
+- `TRON_PRO_API_KEY`
+- `TRON_NETWORK=mainnet`
+- `CRON_SECRET`
+- `NEXT_PUBLIC_APP_NAME=USDT Earn`

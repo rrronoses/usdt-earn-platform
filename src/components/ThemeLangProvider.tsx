@@ -51,7 +51,7 @@ const dict = {
     noData: 'No data yet',
     heroTitle: 'Earn USDT every single day',
     heroSub:
-      'Choose a plan, claim daily yield, and grow with 20% referral commissions. Start free — no deposit required for your first Bronze plan.',
+      'Choose a plan, claim daily earnings, and grow with 20% referral commissions. Start free — no deposit required for your first Bronze plan.',
     getStarted: 'Start free — 3 USDT bonus',
     viewPlans: 'View plans',
   },
@@ -93,7 +93,7 @@ const dict = {
     noData: 'Aucune donnée',
     heroTitle: 'Gagnez des USDT chaque jour',
     heroSub:
-      'Choisissez un plan, réclamez le rendement quotidien et progressez avec 20 % de commission de parrainage. Commencez gratuitement.',
+      'Choisissez un plan, réclamez les gains quotidiens et progressez avec 20 % de commission de parrainage. Commencez gratuitement.',
     getStarted: 'Commencer — 3 USDT offerts',
     viewPlans: 'Voir les plans',
   },

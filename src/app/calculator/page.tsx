@@ -29,10 +29,9 @@ export default function CalculatorPage() {
   const result = useMemo(() => {
     const invest = plan.price * qty;
     const daily = plan.daily * qty;
-    const totalYield = plan.daily * plan.days * qty;
-    const net = totalYield; // yield paid as claims (not returning principal from deposit)
-    const roi = invest > 0 ? Math.round((totalYield / invest) * 100) : 0;
-    return { invest, daily, totalYield, net, roi };
+    const totalEarn = plan.daily * plan.days * qty;
+    const roi = invest > 0 ? Math.round((totalEarn / invest) * 100) : 0;
+    return { invest, daily, totalEarn, roi };
   }, [plan, qty]);
 
   return (
@@ -50,7 +49,7 @@ export default function CalculatorPage() {
 
       <main className="max-w-3xl mx-auto px-4 py-10 space-y-6">
         <div>
-          <h1 className="text-3xl font-black tracking-tight">Yield calculator</h1>
+          <h1 className="text-3xl font-black tracking-tight">Earn calculator</h1>
           <p className="text-slate-400 text-sm mt-2">
             Estimate daily and cycle earnings before you buy a plan.
           </p>
@@ -92,9 +91,6 @@ export default function CalculatorPage() {
               onChange={(e) => setUnits(Number(e.target.value))}
               className="mt-2 w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-700 focus:border-emerald-500 outline-none"
             />
-            <p className="text-xs text-slate-500 mt-1">
-              Bronze is one-time at signup; other tiers can be rebought after expiry.
-            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -107,8 +103,8 @@ export default function CalculatorPage() {
               <p className="text-2xl font-black text-emerald-400 mt-1">{result.daily} USDT</p>
             </div>
             <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-              <p className="text-[11px] text-slate-500 uppercase">Cycle yield ({plan.days}d)</p>
-              <p className="text-2xl font-black text-teal-300 mt-1">{result.totalYield} USDT</p>
+              <p className="text-[11px] text-slate-500 uppercase">Cycle earn ({plan.days}d)</p>
+              <p className="text-2xl font-black text-teal-300 mt-1">{result.totalEarn} USDT</p>
             </div>
             <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4">
               <p className="text-[11px] text-emerald-300/80 uppercase">ROI on plan price</p>
@@ -123,10 +119,6 @@ export default function CalculatorPage() {
             Start earning — free 3 USDT
           </Link>
         </div>
-
-        <p className="text-xs text-slate-600 text-center">
-          Estimates only. Claims require active plans and once-per-day eligibility.
-        </p>
       </main>
     </div>
   );

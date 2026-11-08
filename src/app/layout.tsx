@@ -5,7 +5,7 @@ import { ToastProvider } from '@/components/Toast';
 import { OfflineBanner } from '@/components/OfflineBanner';
 
 export const metadata: Metadata = {
-  title: 'USDT Earn — Daily USDT Yield Plans',
+  title: 'USDT Earn — Daily USDT Plans',
   description:
     'USDT Earn: invest USDT TRC-20, claim daily earnings, earn 20% referral commissions. Start free with 3 USDT.',
   openGraph: {
