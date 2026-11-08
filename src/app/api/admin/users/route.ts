@@ -1,8 +1,15 @@
 import { NextResponse } from 'next/server';
 import { getStorage } from '@/lib/memory-kv';
 import {
-  ensureSeeded, listUsers, getUser, saveUser, getUserPlans, getUserTransactions,
-  saveTx, generateId,
+  ensureSeeded,
+  listUsers,
+  getUser,
+  saveUser,
+  deleteUser,
+  getUserPlans,
+  getUserTransactions,
+  saveTx,
+  generateId,
 } from '@/lib/kv';
 import { getAdminToken, parseToken } from '@/lib/auth';
 import type { Transaction } from '@/types';
@@ -68,22 +75,19 @@ export async function POST(req: Request) {
   if (action === 'ban' && user) {
     user.status = 'banned';
     await saveUser(kv, user);
-    return NextResponse.json({ ok: true, user: { ...user, passwordHash: undefined } });
+    return NextResponse.json({ ok: true, message: 'User banned', user: { ...user, passwordHash: undefined } });
   }
   if (action === 'unban' && user) {
     user.status = 'active';
     await saveUser(kv, user);
-    return NextResponse.json({ ok: true, user: { ...user, passwordHash: undefined } });
+    return NextResponse.json({ ok: true, message: 'User unbanned', user: { ...user, passwordHash: undefined } });
   }
   if (action === 'delete') {
-    if (user) {
-      user.status = 'banned';
-      user.depositBalance = 0;
-      user.withdrawalBalance = 0;
-      user.email = `deleted_${user.id}@removed.local`;
-      await saveUser(kv, user);
-    }
-    return NextResponse.json({ ok: true, message: 'User removed' });
+    const removed = await deleteUser(kv, userId);
+    return NextResponse.json({
+      ok: true,
+      message: removed ? 'User permanently deleted' : 'User key cleared',
+    });
   }
   if (action === 'adjustBalance' && user) {
     const amount = Number(body.amount);
@@ -109,7 +113,7 @@ export async function POST(req: Request) {
       description: `Admin ${amount > 0 ? 'added' : 'subtracted'} ${Math.abs(amount)} USDT (${balanceType})`,
       timestamp: now,
     } as Transaction);
-    return NextResponse.json({ ok: true, user: { ...user, passwordHash: undefined } });
+    return NextResponse.json({ ok: true, message: 'Balance updated', user: { ...user, passwordHash: undefined } });
   }
 
   return NextResponse.json({ ok: false, message: 'Unknown action' }, { status: 400 });
