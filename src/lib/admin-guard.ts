@@ -1,4 +1,4 @@
-import { getAdminToken, parseToken } from '@/lib/auth';
+import { getAdminToken, getUserToken, parseToken } from '@/lib/auth';
 import { jsonError } from '@/lib/http';
 
 export function requireAdmin() {
@@ -14,7 +14,6 @@ export function requireAdmin() {
 }
 
 export function requireUser() {
-  const { getUserToken } = require('@/lib/auth') as typeof import('@/lib/auth');
   const token = getUserToken();
   if (!token) {
     return { ok: false as const, response: jsonError('UNAUTHORIZED', 'Authentication required') };
