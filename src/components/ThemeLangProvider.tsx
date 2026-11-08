@@ -1,9 +1,16 @@
 'use client';
 
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
 
-type Theme = 'dark' | 'light';
-type Lang = 'en' | 'fr';
+export type Theme = 'dark' | 'light';
+export type Lang = 'en' | 'fr';
 
 const dict = {
   en: {
@@ -15,7 +22,7 @@ const dict = {
     deposit: 'Deposit',
     withdraw: 'Withdraw',
     today: 'Today',
-    claim: 'Claim daily earnings',
+    claim: 'Claim earnings',
     login: 'Login',
     signup: 'Sign up',
     logout: 'Logout',
@@ -25,6 +32,28 @@ const dict = {
     transactions: 'Transactions',
     language: 'Language',
     theme: 'Theme',
+    welcome: 'Welcome back',
+    buyPlan: 'Buy plan',
+    activePlans: 'Active plans',
+    recentActivity: 'Recent activity',
+    fullHistory: 'Full history',
+    referralEarnings: 'Referral earnings',
+    copyLink: 'Copy link',
+    generateAddress: 'Generate deposit address',
+    checkChain: 'Check chain now',
+    pending: 'Pending',
+    completed: 'Completed',
+    approved: 'Approved',
+    rejected: 'Rejected',
+    save: 'Save',
+    cancel: 'Cancel',
+    loading: 'Loading…',
+    noData: 'No data yet',
+    heroTitle: 'Earn USDT every single day',
+    heroSub:
+      'Choose a plan, claim daily yield, and grow with 20% referral commissions. Start free — no deposit required for your first Bronze plan.',
+    getStarted: 'Start free — 3 USDT bonus',
+    viewPlans: 'View plans',
   },
   fr: {
     dashboard: 'Accueil',
@@ -45,11 +74,33 @@ const dict = {
     transactions: 'Transactions',
     language: 'Langue',
     theme: 'Thème',
+    welcome: 'Bon retour',
+    buyPlan: 'Acheter un plan',
+    activePlans: 'Plans actifs',
+    recentActivity: 'Activité récente',
+    fullHistory: 'Historique complet',
+    referralEarnings: 'Gains de parrainage',
+    copyLink: 'Copier le lien',
+    generateAddress: 'Générer une adresse de dépôt',
+    checkChain: 'Vérifier la chaîne',
+    pending: 'En attente',
+    completed: 'Terminé',
+    approved: 'Approuvé',
+    rejected: 'Rejeté',
+    save: 'Enregistrer',
+    cancel: 'Annuler',
+    loading: 'Chargement…',
+    noData: 'Aucune donnée',
+    heroTitle: 'Gagnez des USDT chaque jour',
+    heroSub:
+      'Choisissez un plan, réclamez le rendement quotidien et progressez avec 20 % de commission de parrainage. Commencez gratuitement.',
+    getStarted: 'Commencer — 3 USDT offerts',
+    viewPlans: 'Voir les plans',
   },
 } as const;
 
-type TranslationKey = keyof (typeof dict)['en'];
-type Translations = Record<TranslationKey, string>;
+export type TranslationKey = keyof (typeof dict)['en'];
+export type Translations = Record<TranslationKey, string>;
 
 type Ctx = {
   theme: Theme;
@@ -61,9 +112,10 @@ type Ctx = {
 
 const ThemeLangContext = createContext<Ctx | null>(null);
 
-export function ThemeLangProvider({ children }: { children: React.ReactNode }) {
+export function ThemeLangProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>('dark');
   const [lang, setLangState] = useState<Lang>('en');
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     const th = (localStorage.getItem('theme') as Theme) || 'dark';
@@ -73,6 +125,7 @@ export function ThemeLangProvider({ children }: { children: React.ReactNode }) {
     document.documentElement.classList.toggle('dark', th === 'dark');
     document.documentElement.classList.toggle('light', th === 'light');
     document.documentElement.lang = lg;
+    setReady(true);
   }, []);
 
   const setTheme = (t: Theme) => {
@@ -93,7 +146,13 @@ export function ThemeLangProvider({ children }: { children: React.ReactNode }) {
     [theme, lang]
   );
 
-  return <ThemeLangContext.Provider value={value}>{children}</ThemeLangContext.Provider>;
+  return (
+    <ThemeLangContext.Provider value={value}>
+      <div style={{ visibility: ready ? 'visible' : 'hidden' }} className="min-h-screen">
+        {children}
+      </div>
+    </ThemeLangContext.Provider>
+  );
 }
 
 export function useThemeLang() {
