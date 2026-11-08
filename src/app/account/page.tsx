@@ -80,9 +80,7 @@ export default function AccountPage() {
   }
 
   function changePassword() {
-    if (newPass.length < 6) {
-      setMsg('New password must be at least 6 characters');\n      return;
-    }
+    if (newPass.length < 6) return void setMsg('Password too short (min 6)');
     setMsg('Password change will be available after security module is enabled.');
     setCurPass('');
     setNewPass('');
