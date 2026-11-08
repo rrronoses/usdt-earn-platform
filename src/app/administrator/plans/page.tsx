@@ -55,7 +55,7 @@ export default function AdminPlansPage() {
   }
 
   return (
-    <AdminShell title="Plans" subtitle="Yield tiers shown in the user panel">
+    <AdminShell title="Plans" subtitle="Earn tiers shown in the user panel">
       {msg && (
         <div className="mb-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-300 text-sm">
           {msg}
@@ -133,7 +133,7 @@ export default function AdminPlansPage() {
         />
         <input
           type="number"
-          placeholder="Daily yield"
+          placeholder="Daily earn"
           value={form.dailyYield}
           onChange={(e) => setForm({ ...form, dailyYield: Number(e.target.value) })}
           className="input-field"
