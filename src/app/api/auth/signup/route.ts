@@ -1,4 +1,3 @@
-import { NextResponse } from 'next/server';
 import { getStorage } from '@/lib/memory-kv';
 import {
   ensureSeeded,
@@ -16,61 +15,56 @@ import {
 } from '@/lib/kv';
 import { hashPassword, createToken, userCookieOptions } from '@/lib/auth';
 import type { User, UserPlan, Transaction } from '@/types';
+import { signupSchema } from '@/lib/schemas';
+import { parseJson, jsonOk, jsonError, withSecurityHeaders } from '@/lib/http';
+import { rateLimit } from '@/lib/rate-limit';
+import { log } from '@/lib/logger';
 
 export const runtime = 'edge';
 
 export async function POST(req: Request) {
+  const parsedBody = await parseJson(req, signupSchema);
+  if (!parsedBody.ok) return withSecurityHeaders(parsedBody.response);
+
+  const { username, password } = parsedBody.data;
+  const email = parsedBody.data.email.trim().toLowerCase();
+  const referralCode = parsedBody.data.referralCode?.trim();
+
+  const kv = getStorage();
+  await ensureSeeded(kv);
+
+  const rl = await rateLimit(kv, `signup:${email}`, { limit: 5, windowSec: 3600 });
+  if (!rl.allowed) {
+    return withSecurityHeaders(
+      jsonError('RATE_LIMITED', `Too many signups. Retry in ${rl.retryAfterSec}s`)
+    );
+  }
+
   try {
-    const body: any = await req.json();
-    const username = String(body.username || '').trim();
-    const email = String(body.email || '').trim().toLowerCase();
-    const password = String(body.password || '');
-    const referralCode = body.referralCode ? String(body.referralCode).trim() : undefined;
-
-    if (!username || username.length < 3) {
-      return NextResponse.json(
-        { ok: false, message: 'Username must be at least 3 characters' },
-        { status: 400 }
-      );
-    }
-    if (!email || !email.includes('@')) {
-      return NextResponse.json({ ok: false, message: 'Valid email required' }, { status: 400 });
-    }
-    if (password.length < 6) {
-      return NextResponse.json(
-        { ok: false, message: 'Password must be at least 6 characters' },
-        { status: 400 }
-      );
-    }
-
-    const kv = getStorage();
-    await ensureSeeded(kv);
-
     if (await getUserByEmail(kv, email)) {
-      return NextResponse.json({ ok: false, message: 'Email already registered' }, { status: 400 });
+      return withSecurityHeaders(jsonError('CONFLICT', 'Email already registered'));
     }
     if (await getUserByUsername(kv, username)) {
-      return NextResponse.json({ ok: false, message: 'Username already taken' }, { status: 400 });
+      return withSecurityHeaders(jsonError('CONFLICT', 'Username already taken'));
     }
 
     let referredBy: string | null = null;
     if (referralCode) {
       const ref = await getUser(kv, referralCode);
       if (!ref) {
-        return NextResponse.json({ ok: false, message: 'Invalid referral code' }, { status: 400 });
+        return withSecurityHeaders(jsonError('BAD_REQUEST', 'Invalid referral code'));
       }
       referredBy = ref.id;
     }
 
     const id = generateUserId();
     const now = new Date().toISOString();
-    const passwordHash = hashPassword(password);
 
     const user: User = {
       id,
       username,
       email,
-      passwordHash,
+      passwordHash: hashPassword(password),
       depositBalance: 3,
       withdrawalBalance: 0,
       todayEarnings: 0,
@@ -125,15 +119,15 @@ export async function POST(req: Request) {
     await saveAnalytics(kv, analytics);
 
     const token = createToken(id, 'user');
-    const res = NextResponse.json({
-      ok: true,
+    const res = jsonOk({
       message: 'Account created! Free 3 USDT Bronze plan assigned.',
       user: { id, username, email },
     });
     res.cookies.set(userCookieOptions(token));
-    return res;
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : 'Signup failed';
-    return NextResponse.json({ ok: false, message: msg }, { status: 500 });
+    log.info('auth.signup.ok', { userId: id });
+    return withSecurityHeaders(res);
+  } catch (e) {
+    log.error('auth.signup.error', { message: e instanceof Error ? e.message : 'unknown' });
+    return withSecurityHeaders(jsonError('INTERNAL', 'Signup failed'));
   }
 }
