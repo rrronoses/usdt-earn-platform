@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { ThemeLangProvider } from '@/components/ThemeLangProvider';
 import { ToastProvider } from '@/components/Toast';
+import { OfflineBanner } from '@/components/OfflineBanner';
 
 export const metadata: Metadata = {
   title: 'USDT Earn — Daily USDT Yield Plans',
@@ -28,7 +29,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className="dark" suppressHydrationWarning>
       <body className="min-h-screen antialiased mesh-bg bg-slate-950 text-slate-100">
         <ThemeLangProvider>
-          <ToastProvider>{children}</ToastProvider>
+          <ToastProvider>
+            {children}
+            <OfflineBanner />
+          </ToastProvider>
         </ThemeLangProvider>
       </body>
     </html>
