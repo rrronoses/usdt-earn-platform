@@ -3,7 +3,7 @@ import Link from 'next/link';
 const FAQS = [
   {
     q: 'How do I start?',
-    a: 'Create a free account. You receive 3 USDT and a Bronze plan automatically. Claim daily yield from the dashboard.',
+    a: 'Create a free account. You receive 3 USDT and a Bronze plan automatically. Claim daily earnings from the dashboard.',
   },
   {
     q: 'Which network is used for deposits?',
@@ -36,12 +36,8 @@ export default function FaqPage() {
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <header className="border-b border-white/5 sticky top-0 glass z-20">
         <div className="max-w-3xl mx-auto px-4 h-14 flex items-center justify-between">
-          <Link href="/" className="font-bold">
-            USDT<span className="text-emerald-400">Earn</span>
-          </Link>
-          <Link href="/support" className="text-sm text-emerald-400 font-semibold">
-            Support
-          </Link>
+          <Link href="/" className="font-bold">USDT<span className="text-emerald-400">Earn</span></Link>
+          <Link href="/support" className="text-sm text-emerald-400 font-semibold">Support</Link>
         </div>
       </header>
       <main className="max-w-3xl mx-auto px-4 py-10">
@@ -49,10 +45,7 @@ export default function FaqPage() {
         <p className="text-slate-400 text-sm mb-8">Answers to common questions about USDT Earn.</p>
         <div className="space-y-3">
           {FAQS.map((item) => (
-            <details
-              key={item.q}
-              className="group rounded-2xl border border-white/10 bg-slate-900/50 open:border-emerald-500/30"
-            >
+            <details key={item.q} className="group rounded-2xl border border-white/10 bg-slate-900/50 open:border-emerald-500/30">
               <summary className="cursor-pointer list-none px-5 py-4 font-semibold flex items-center justify-between gap-3">
                 {item.q}
                 <span className="text-slate-500 group-open:rotate-45 transition text-lg">+</span>

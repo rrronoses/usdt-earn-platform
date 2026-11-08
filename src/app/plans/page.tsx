@@ -57,7 +57,7 @@ export default function PlansPage() {
         body: JSON.stringify({ planId }),
       });
       const d: any = await res.json();
-      setMsg(d.message || (d.ok ? 'Plan purchased! Claim combines all active plans.' : 'Failed'));
+      setMsg(d.message || (d.ok ? 'Plan purchased!' : 'Failed'));
       if (d.ok) load();
     } catch {
       setMsg('Network error');
@@ -78,7 +78,7 @@ export default function PlansPage() {
         <div className="flex items-start justify-between gap-3">
           <div>
             <h1 className="text-2xl font-black tracking-tight">{t.plans}</h1>
-            <p className="text-xs text-slate-500 mt-1">Stack plans — claim adds all daily yields</p>
+            <p className="text-xs text-slate-500 mt-1">Stack plans — claim each plan daily</p>
           </div>
           <div className="text-right rounded-2xl bg-emerald-500/10 border border-emerald-500/30 px-3.5 py-2.5">
             <p className="text-[10px] text-slate-400 uppercase tracking-wide">Deposit</p>
@@ -97,22 +97,18 @@ export default function PlansPage() {
         )}
 
         <div className="rounded-2xl border border-white/5 bg-slate-900/50 p-3.5 text-sm text-slate-300 leading-relaxed">
-          Buy with deposit balance. If you own <strong className="text-white">two plans</strong>, one
-          claim pays <strong className="text-emerald-300">both</strong> daily amounts.
+          Buy with deposit balance. Claim each active plan separately every day.
         </div>
 
         {msg && (
-          <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-200 text-sm text-center">
-            {msg}
-          </div>
+          <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-200 text-sm text-center">{msg}</div>
         )}
 
         {plans.map((p) => {
           const total = p.dailyYield * p.durationDays;
           const isBronze = p.isOneTime || p.id === 'bronze';
           const hasActive = owned.some((o) => o.planId === p.id);
-          const featured =
-            p.price === 25 || p.price === 60 || (p.badge && p.badge.length > 0);
+          const featured = p.price === 25 || p.price === 60 || (p.badge && p.badge.length > 0);
           const canAfford = depositBalance >= p.price;
 
           return (
@@ -134,9 +130,7 @@ export default function PlansPage() {
                       </span>
                     )}
                     {hasActive && (
-                      <span className="text-[10px] uppercase px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/30 font-bold">
-                        Owned
-                      </span>
+                      <span className="text-[10px] uppercase px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/30 font-bold">Owned</span>
                     )}
                   </div>
                   <p className="text-xs text-slate-500 mt-1">
@@ -159,7 +153,7 @@ export default function PlansPage() {
                   <p className="font-bold text-lg text-emerald-300">{p.dailyYield}</p>
                 </div>
                 <div className="rounded-xl bg-black/35 border border-white/5 py-2.5">
-                  <p className="text-[10px] text-slate-500 uppercase">Max yield</p>
+                  <p className="text-[10px] text-slate-500 uppercase">Max earn</p>
                   <p className="font-bold text-lg">{total}</p>
                 </div>
               </div>
@@ -187,18 +181,12 @@ export default function PlansPage() {
           );
         })}
 
-        {plans.length === 0 && (
-          <p className="text-slate-500 text-center py-16">Loading plans…</p>
-        )}
+        {plans.length === 0 && <p className="text-slate-500 text-center py-16">Loading plans…</p>}
 
         {depositBalance < 10 && (
           <div className="rounded-2xl border border-white/5 bg-slate-900/50 p-4 text-center text-sm text-slate-400">
             Low deposit?{' '}
-            <button
-              type="button"
-              onClick={() => router.push('/dashboard')}
-              className="text-emerald-400 font-semibold"
-            >
+            <button type="button" onClick={() => router.push('/dashboard')} className="text-emerald-400 font-semibold">
               Deposit USDT on dashboard
             </button>
           </div>

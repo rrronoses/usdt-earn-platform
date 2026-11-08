@@ -18,9 +18,8 @@ import type { Transaction } from '@/types';
 export const runtime = 'edge';
 
 /**
- * Claim daily yield for ONE purchased plan.
+ * Claim daily earn for ONE purchased plan.
  * Body: { userPlanId: string }
- * Each plan has its own lastClaimedAt — Free/Bronze and Silver can be claimed separately same day.
  */
 export async function POST(req: NextRequest) {
   const token = getUserToken();
@@ -45,7 +44,6 @@ export async function POST(req: NextRequest) {
   const now = new Date().toISOString();
   let plans = await getUserPlans(kv, user.id);
 
-  // Expire outdated plans
   plans = plans.map((p) => {
     if (p.status === 'active' && new Date(p.expiryDate) < new Date()) {
       return { ...p, status: 'expired' as const };
@@ -68,20 +66,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, message: 'This plan is expired' }, { status: 400 });
   }
 
-  // Per-plan daily claim lock (not global)
   if (isSameDay(plan.lastClaimedAt, now)) {
     return NextResponse.json(
-      {
-        ok: false,
-        message: `Already claimed ${plan.name} today. Come back tomorrow.`,
-      },
+      { ok: false, message: `Already claimed ${plan.name} today. Come back tomorrow.` },
       { status: 400 }
     );
   }
 
   const amount = Number(plan.dailyYield) || 0;
   if (amount <= 0) {
-    return NextResponse.json({ ok: false, message: 'Invalid plan yield' }, { status: 400 });
+    return NextResponse.json({ ok: false, message: 'Invalid plan earn amount' }, { status: 400 });
   }
 
   plans[idx] = {
@@ -91,7 +85,6 @@ export async function POST(req: NextRequest) {
   };
 
   user.withdrawalBalance = Number((user.withdrawalBalance + amount).toFixed(6));
-  // todayEarnings = sum of claims done today (approx: add this claim)
   if (isSameDay(user.lastClaimDate, now)) {
     user.todayEarnings = Number((user.todayEarnings + amount).toFixed(6));
   } else {
@@ -108,7 +101,7 @@ export async function POST(req: NextRequest) {
     type: 'yield',
     amount,
     status: 'completed',
-    description: `Daily claim ${amount} USDT — ${plan.name}`,
+    description: `Daily earn ${amount} USDT — ${plan.name}`,
     timestamp: now,
   } as Transaction);
 

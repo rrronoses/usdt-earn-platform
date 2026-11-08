@@ -29,7 +29,7 @@ const modules = [
   {
     href: '/administrator/plans',
     title: 'Plans',
-    desc: 'Create, edit, and retire yield tiers',
+    desc: 'Create, edit, and retire earn tiers',
     icon: '◈',
     accent: 'from-emerald-500/20 to-teal-900/10 border-emerald-500/30',
   },
@@ -63,14 +63,16 @@ export default function AdminDashboardPage() {
       fetch('/api/admin/users?filter=paid').then((r) => r.json()),
       fetch('/api/admin/withdrawals').then((r) => r.json()),
       fetch('/api/admin/deposit-addresses').then((r) => r.json()),
-    ]).then(([all, paid, w, addr]: any[]) => {
-      setStats({
-        users: all.ok ? (all.users || []).length : 0,
-        paid: paid.ok ? (paid.users || []).length : 0,
-        pendingW: w.ok ? (w.withdrawals || []).length : 0,
-        addresses: addr.ok ? (addr.addresses || []).filter((a: any) => a.active).length : 0,
-      });
-    }).catch(() => {});
+    ])
+      .then(([all, paid, w, addr]: any[]) => {
+        setStats({
+          users: all.ok ? (all.users || []).length : 0,
+          paid: paid.ok ? (paid.users || []).length : 0,
+          pendingW: w.ok ? (w.withdrawals || []).length : 0,
+          addresses: addr.ok ? (addr.addresses || []).filter((a: any) => a.active).length : 0,
+        });
+      })
+      .catch(() => {});
   }, []);
 
   const kpi = [
@@ -81,16 +83,10 @@ export default function AdminDashboardPage() {
   ];
 
   return (
-    <AdminShell
-      title="Overview"
-      subtitle="USDTSTORAGE · TronGrid TRC-20 · Edge runtime"
-    >
+    <AdminShell title="Overview" subtitle="USDTSTORAGE · TronGrid TRC-20 · Edge runtime">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
         {kpi.map((k) => (
-          <div
-            key={k.label}
-            className="rounded-2xl border border-white/10 bg-slate-900/60 backdrop-blur p-4 sm:p-5"
-          >
+          <div key={k.label} className="rounded-2xl border border-white/10 bg-slate-900/60 backdrop-blur p-4 sm:p-5">
             <p className="text-[11px] uppercase tracking-wider text-slate-500 font-medium">{k.label}</p>
             <p className={`text-2xl sm:text-3xl font-black mt-1 ${k.tone}`}>{k.value}</p>
           </div>
