@@ -23,8 +23,6 @@ import {
   getAnalytics,
   saveAnalytics,
   listPendingDeposits,
-  keys,
-  putJSON,
 } from './kv';
 import {
   fetchUsdtTrc20Transfers,
@@ -42,8 +40,6 @@ export interface VerifyResult {
   userId?: string;
   depositId?: string;
 }
-
-const LOCK_TTL_HINT_MS = 30_000;
 
 async function acquireTxLock(kv: KVNamespace, txId: string): Promise<boolean> {
   const lockKey = `processed_tx:${txId}:lock`;
@@ -77,7 +73,6 @@ async function creditDeposit(
     };
   }
 
-  // Re-check after lock
   if (await isTxProcessed(kv, match.transactionId)) {
     return {
       credited: false,
@@ -94,7 +89,6 @@ async function creditDeposit(
 
   const creditAmount = Number(match.amount.toFixed(6));
 
-  // Mark processed BEFORE balance mutation (crash-safe preference: no double credit)
   await markTxProcessed(kv, match.transactionId, {
     userId: user.id,
     amount: creditAmount,
@@ -151,7 +145,6 @@ async function creditDeposit(
   };
 }
 
-/** Pick best transfer for a pending deposit (exact amount preferred). */
 function pickMatch(
   transfers: Trc20Transfer[],
   dep: DepositRequest,
@@ -167,10 +160,7 @@ function pickMatch(
 
   if (!candidates.length) return null;
 
-  // Exact amount first, then closest >= expected
-  const exact = candidates.find(
-    (t) => Math.abs(t.amount - dep.amount) < 0.000001
-  );
+  const exact = candidates.find((t) => Math.abs(t.amount - dep.amount) < 0.000001);
   if (exact) return exact;
 
   candidates.sort((a, b) => a.amount - b.amount || a.blockTimestamp - b.blockTimestamp);
@@ -189,10 +179,7 @@ export async function verifyDepositWatch(
 
   if (!dep && opts.address) {
     const pending = await listPendingDeposits(kv);
-    dep =
-      pending.find(
-        (d) => d.address === opts.address && d.status === 'pending'
-      ) || null;
+    dep = pending.find((d) => d.address === opts.address && d.status === 'pending') || null;
   }
 
   if (!dep) {
@@ -252,7 +239,6 @@ export async function verifyAllPendingDeposits(kv: KVNamespace): Promise<{
   const results: VerifyResult[] = [];
   let credited = 0;
 
-  // Group by address to minimize TronGrid calls
   const byAddress = new Map<string, DepositRequest[]>();
   for (const dep of pending) {
     const list = byAddress.get(dep.address) || [];
@@ -277,11 +263,7 @@ export async function verifyAllPendingDeposits(kv: KVNamespace): Promise<{
       });
     } catch {
       for (const d of deps) {
-        results.push({
-          credited: false,
-          reason: 'TronGrid error',
-          depositId: d.id,
-        });
+        results.push({ credited: false, reason: 'TronGrid error', depositId: d.id });
       }
       continue;
     }
@@ -291,7 +273,6 @@ export async function verifyAllPendingDeposits(kv: KVNamespace): Promise<{
       if (await isTxProcessed(kv, t.transactionId)) usedTxIds.add(t.transactionId);
     }
 
-    // Process smaller expected amounts first to reduce mis-assignment
     const ordered = [...deps].sort((a, b) => a.amount - b.amount);
     for (const dep of ordered) {
       if (dep.status !== 'pending') continue;
@@ -313,8 +294,3 @@ export async function verifyAllPendingDeposits(kv: KVNamespace): Promise<{
 
   return { checked: pending.length, credited, results };
 }
-
-// Silence unused import warning if keys/putJSON unused in some builds
-void keys;
-void putJSON;
-void LOCK_TTL_HINT_MS;
