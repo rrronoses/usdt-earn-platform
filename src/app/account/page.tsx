@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { UserNav } from '@/components/UserNav';
 import { useThemeLang } from '@/components/ThemeLangProvider';
+import { txTypeLabel } from '@/lib/labels';
 
 type Tx = {
   id: string;
@@ -77,8 +78,7 @@ export default function AccountPage() {
 
   async function changePassword() {
     if (newPass.length < 6) {
-      setMsg('New password must be at least 6 characters');
-      return;
+      setMsg('New password must be at least 6 characters');\n      return;
     }
     setMsg('Password change will be available after security module is enabled.');
     setCurPass('');
@@ -115,7 +115,6 @@ export default function AccountPage() {
           </div>
         )}
 
-        {/* Profile */}
         <div className="rounded-3xl border border-white/5 bg-gradient-to-br from-slate-900 to-slate-950 p-5 flex items-center gap-4">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={avatar} alt="" className="w-16 h-16 rounded-2xl bg-slate-800 ring-2 ring-emerald-500/30" />
@@ -140,7 +139,6 @@ export default function AccountPage() {
           </div>
         </div>
 
-        {/* Withdraw */}
         <div className="rounded-2xl border border-white/5 bg-slate-900/60 p-4 space-y-3">
           <h2 className="font-semibold text-lg">{t.withdraw}</h2>
           <div className="rounded-xl bg-black/30 border border-white/5 p-3 flex justify-between text-sm">
@@ -172,7 +170,6 @@ export default function AccountPage() {
           </button>
         </div>
 
-        {/* Withdrawal history */}
         <div className="rounded-2xl border border-white/5 bg-slate-900/40 overflow-hidden">
           <div className="px-4 py-3 border-b border-white/5">
             <h2 className="font-semibold">Withdrawal history</h2>
@@ -204,7 +201,6 @@ export default function AccountPage() {
           )}
         </div>
 
-        {/* All transactions */}
         <div className="rounded-2xl border border-white/5 bg-slate-900/40 overflow-hidden">
           <div className="px-4 py-3 border-b border-white/5 flex flex-wrap items-center justify-between gap-2">
             <h2 className="font-semibold">{t.transactions}</h2>
@@ -217,7 +213,7 @@ export default function AccountPage() {
               {['deposit', 'withdrawal', 'yield', 'referral', 'plan_purchase', 'signup_bonus', 'admin_add', 'admin_sub'].map(
                 (type) => (
                   <option key={type} value={type}>
-                    {type}
+                    {txTypeLabel(type)}
                   </option>
                 )
               )}
@@ -229,7 +225,7 @@ export default function AccountPage() {
                 <div className="min-w-0">
                   <p className="truncate">{tx.description}</p>
                   <p className="text-[11px] text-slate-500">
-                    {tx.type} · {tx.status} · {new Date(tx.timestamp).toLocaleString()}
+                    {txTypeLabel(tx.type)} · {tx.status} · {new Date(tx.timestamp).toLocaleString()}
                   </p>
                 </div>
                 <span className={`font-mono shrink-0 ${tx.amount >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
@@ -244,7 +240,6 @@ export default function AccountPage() {
           </div>
         </div>
 
-        {/* Password */}
         <div className="rounded-2xl border border-white/5 bg-slate-900/60 p-4 space-y-3">
           <h2 className="font-semibold">Change password</h2>
           <input
