@@ -6,6 +6,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  useCallback,
   type ReactNode,
 } from 'react';
 
@@ -54,6 +55,11 @@ const dict = {
       'Choose a plan, claim daily earnings, and grow with 20% referral commissions. Start free — no deposit required for your first Bronze plan.',
     getStarted: 'Start free — 3 USDT bonus',
     viewPlans: 'View plans',
+    changePassword: 'Change password',
+    history: 'History',
+    profile: 'Profile',
+    depositNotes: 'Deposit guide',
+    withdrawNotes: 'Withdrawal guide',
   },
   fr: {
     dashboard: 'Accueil',
@@ -96,6 +102,11 @@ const dict = {
       'Choisissez un plan, réclamez les gains quotidiens et progressez avec 20 % de commission de parrainage. Commencez gratuitement.',
     getStarted: 'Commencer — 3 USDT offerts',
     viewPlans: 'Voir les plans',
+    changePassword: 'Changer le mot de passe',
+    history: 'Historique',
+    profile: 'Profil',
+    depositNotes: 'Guide de dépôt',
+    withdrawNotes: 'Guide de retrait',
   },
 } as const;
 
@@ -107,10 +118,20 @@ type Ctx = {
   lang: Lang;
   setTheme: (t: Theme) => void;
   setLang: (l: Lang) => void;
+  toggleTheme: () => void;
+  toggleLang: () => void;
   t: Translations;
 };
 
 const ThemeLangContext = createContext<Ctx | null>(null);
+
+function applyTheme(t: Theme) {
+  const root = document.documentElement;
+  root.classList.remove('dark', 'light');
+  root.classList.add(t);
+  root.setAttribute('data-theme', t);
+  root.style.colorScheme = t;
+}
 
 export function ThemeLangProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>('dark');
@@ -118,37 +139,85 @@ export function ThemeLangProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const th = (localStorage.getItem('theme') as Theme) || 'dark';
-    const lg = (localStorage.getItem('lang') as Lang) || 'en';
+    let th: Theme = 'dark';
+    let lg: Lang = 'en';
+    try {
+      const storedTh = localStorage.getItem('theme');
+      const storedLg = localStorage.getItem('lang');
+      if (storedTh === 'light' || storedTh === 'dark') th = storedTh;
+      if (storedLg === 'fr' || storedLg === 'en') lg = storedLg;
+    } catch {
+      /* ignore */
+    }
     setThemeState(th);
     setLangState(lg);
-    document.documentElement.classList.toggle('dark', th === 'dark');
-    document.documentElement.classList.toggle('light', th === 'light');
+    applyTheme(th);
     document.documentElement.lang = lg;
     setReady(true);
   }, []);
 
-  const setTheme = (t: Theme) => {
+  const setTheme = useCallback((t: Theme) => {
     setThemeState(t);
-    localStorage.setItem('theme', t);
-    document.documentElement.classList.toggle('dark', t === 'dark');
-    document.documentElement.classList.toggle('light', t === 'light');
-  };
+    try {
+      localStorage.setItem('theme', t);
+    } catch {
+      /* ignore */
+    }
+    applyTheme(t);
+  }, []);
 
-  const setLang = (l: Lang) => {
+  const setLang = useCallback((l: Lang) => {
     setLangState(l);
-    localStorage.setItem('lang', l);
+    try {
+      localStorage.setItem('lang', l);
+    } catch {
+      /* ignore */
+    }
     document.documentElement.lang = l;
-  };
+  }, []);
+
+  const toggleTheme = useCallback(() => {
+    setThemeState((prev) => {
+      const next: Theme = prev === 'dark' ? 'light' : 'dark';
+      try {
+        localStorage.setItem('theme', next);
+      } catch {
+        /* ignore */
+      }
+      applyTheme(next);
+      return next;
+    });
+  }, []);
+
+  const toggleLang = useCallback(() => {
+    setLangState((prev) => {
+      const next: Lang = prev === 'en' ? 'fr' : 'en';
+      try {
+        localStorage.setItem('lang', next);
+      } catch {
+        /* ignore */
+      }
+      document.documentElement.lang = next;
+      return next;
+    });
+  }, []);
 
   const value = useMemo(
-    () => ({ theme, lang, setTheme, setLang, t: dict[lang] as Translations }),
-    [theme, lang]
+    () => ({
+      theme,
+      lang,
+      setTheme,
+      setLang,
+      toggleTheme,
+      toggleLang,
+      t: dict[lang] as Translations,
+    }),
+    [theme, lang, setTheme, setLang, toggleTheme, toggleLang]
   );
 
   return (
     <ThemeLangContext.Provider value={value}>
-      <div style={{ visibility: ready ? 'visible' : 'hidden' }} className="min-h-screen">
+      <div className={ready ? 'min-h-screen app-shell' : 'min-h-screen app-shell opacity-0'}>
         {children}
       </div>
     </ThemeLangContext.Provider>
@@ -162,26 +231,26 @@ export function useThemeLang() {
 }
 
 export function ThemeLangToggles() {
-  const { theme, lang, setTheme, setLang } = useThemeLang();
+  const { theme, lang, toggleTheme, toggleLang, t } = useThemeLang();
   return (
     <div className="flex items-center gap-1.5">
       <button
         type="button"
-        onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-        className="w-9 h-9 rounded-xl border border-white/10 bg-white/5 hover:border-emerald-500/40 hover:bg-emerald-500/10 flex items-center justify-center text-base transition"
-        title="Theme"
-        aria-label="Toggle theme"
+        onClick={toggleTheme}
+        className="w-9 h-9 rounded-xl border border-[var(--border)] bg-[var(--card)] hover:border-emerald-500/40 flex items-center justify-center text-base transition"
+        title={t.theme}
+        aria-label={t.theme}
       >
         {theme === 'dark' ? '🌙' : '☀️'}
       </button>
       <button
         type="button"
-        onClick={() => setLang(lang === 'en' ? 'fr' : 'en')}
-        className="h-9 px-2.5 rounded-xl border border-white/10 bg-white/5 hover:border-emerald-500/40 hover:bg-emerald-500/10 text-[11px] font-bold uppercase tracking-wide transition"
-        title="Language"
-        aria-label="Toggle language"
+        onClick={toggleLang}
+        className="h-9 min-w-[2.5rem] px-2.5 rounded-xl border border-[var(--border)] bg-[var(--card)] hover:border-emerald-500/40 text-[11px] font-bold uppercase tracking-wide transition"
+        title={t.language}
+        aria-label={t.language}
       >
-        {lang}
+        {lang === 'en' ? 'EN' : 'FR'}
       </button>
     </div>
   );

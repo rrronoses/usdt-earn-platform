@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { ThemeLangToggles } from './ThemeLangProvider';
+import { ThemeLangToggles, useThemeLang } from './ThemeLangProvider';
 
 const links = [
   { href: '/administrator/dashboard', label: 'Overview', icon: '▣' },
@@ -17,9 +17,10 @@ const links = [
 export function AdminNav() {
   const path = usePathname();
   const router = useRouter();
+  const { t } = useThemeLang();
 
   return (
-    <header className="sticky top-0 z-50 border-b border-white/5 bg-slate-950/90 backdrop-blur-xl">
+    <header className="sticky top-0 z-50 border-b glass" style={{ borderColor: 'var(--border)' }}>
       <div className="max-w-7xl mx-auto px-3 sm:px-4">
         <div className="h-14 flex items-center justify-between gap-3">
           <Link href="/administrator/dashboard" className="flex items-center gap-2.5 shrink-0 group">
@@ -28,9 +29,11 @@ export function AdminNav() {
             </span>
             <div className="hidden sm:block leading-tight">
               <p className="font-bold text-sm tracking-tight">
-                USDT<span className="text-emerald-400">Earn</span>
+                USDT<span className="text-emerald-500">Earn</span>
               </p>
-              <p className="text-[10px] text-slate-500 uppercase tracking-widest">Admin Console</p>
+              <p className="text-[10px] uppercase tracking-widest" style={{ color: 'var(--muted)' }}>
+                Admin Console
+              </p>
             </div>
           </Link>
 
@@ -38,18 +41,18 @@ export function AdminNav() {
             <ThemeLangToggles />
             <button
               type="button"
-              className="text-xs font-medium text-red-400/90 px-2.5 py-1.5 rounded-lg hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition"
+              className="text-xs font-medium text-red-500 px-2.5 py-1.5 rounded-lg hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition"
               onClick={async () => {
                 await fetch('/api/auth/logout', { method: 'POST' });
                 router.push('/administrator');
               }}
             >
-              Logout
+              {t.logout}
             </button>
           </div>
         </div>
 
-        <nav className="flex gap-1 overflow-x-auto pb-2.5 -mx-1 px-1 scrollbar-thin">
+        <nav className="flex gap-1 overflow-x-auto pb-2.5 -mx-1 px-1">
           {links.map((l) => {
             const active = path === l.href || path.startsWith(l.href + '/');
             return (
@@ -59,8 +62,9 @@ export function AdminNav() {
                 className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition ${
                   active
                     ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 shadow-md shadow-emerald-500/20'
-                    : 'text-slate-400 hover:text-white hover:bg-white/5'
+                    : 'hover:bg-white/5'
                 }`}
+                style={active ? undefined : { color: 'var(--muted)' }}
               >
                 <span className="opacity-80">{l.icon}</span>
                 {l.label}
@@ -85,14 +89,18 @@ export function AdminShell({
   actions?: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 relative">
+    <div className="page-shell relative">
       <div className="fixed inset-0 pointer-events-none mesh-bg opacity-80" />
       <AdminNav />
       <main className="relative z-10 max-w-7xl mx-auto px-3 sm:px-4 py-6 sm:py-8">
         <div className="flex flex-wrap items-end justify-between gap-3 mb-6">
           <div>
             <h1 className="text-2xl sm:text-3xl font-black tracking-tight">{title}</h1>
-            {subtitle && <p className="text-sm text-slate-400 mt-1">{subtitle}</p>}
+            {subtitle && (
+              <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>
+                {subtitle}
+              </p>
+            )}
           </div>
           {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
         </div>
