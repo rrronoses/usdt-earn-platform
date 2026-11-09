@@ -39,7 +39,7 @@ export default function InvitationPage() {
         <div className="text-center mb-2">
           <h1 className="text-2xl font-extrabold">{t.invite} · 20%</h1>
           <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>
-            Commission on every paid plan your friends buy
+            Earn 20% of your friends&apos; daily claims from paid plans
           </p>
         </div>
 
@@ -53,6 +53,20 @@ export default function InvitationPage() {
             <span style={{ color: 'var(--muted)' }}>Referrals</span>
             <span className="font-bold">{referrals.length}</span>
           </div>
+        </div>
+
+        <div className="panel-card p-4 text-sm space-y-2" style={{ color: 'var(--muted)' }}>
+          <p className="font-semibold" style={{ color: 'var(--text)' }}>
+            How referral works
+          </p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>
+              <strong className="text-emerald-500">20%</strong> of each daily claim from{' '}
+              <strong>paid plans</strong> (Silver, Gold, Platinum…)
+            </li>
+            <li>Free Bronze plan claims do <strong>not</strong> pay commission</li>
+            <li>Deposits and plan purchase price do <strong>not</strong> pay commission</li>
+          </ul>
         </div>
 
         <div className="panel-card p-4 space-y-3">

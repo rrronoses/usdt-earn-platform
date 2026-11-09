@@ -17,9 +17,23 @@ import type { Transaction } from '@/types';
 
 export const runtime = 'edge';
 
+/** Paid plan ids eligible for referral commission on daily claims. */
+function isPaidPlan(planId: string, planName: string, price: number): boolean {
+  const id = (planId || '').toLowerCase();
+  if (id === 'bronze') return false;
+  // Free bronze is signup-only; never pay referral on its claims
+  if (price > 0 && price <= 3 && id.includes('bronze')) return false;
+  // Any non-bronze active claim from a purchased tier
+  if (id === 'bronze' || planName.toLowerCase() === 'bronze') return false;
+  return true;
+}
+
 /**
  * Claim daily earn for ONE purchased plan.
  * Body: { userPlanId: string }
+ *
+ * Referral: 20% of this claim goes to referrer ONLY when the claimed plan is a paid plan
+ * (not free Bronze). No commission on deposits or plan purchases.
  */
 export async function POST(req: NextRequest) {
   const token = getUserToken();
@@ -105,6 +119,32 @@ export async function POST(req: NextRequest) {
     timestamp: now,
   } as Transaction);
 
+  // 20% referral on paid-plan daily claims only (exclude free Bronze)
+  let referralPaid = 0;
+  const paid = isPaidPlan(plan.planId, plan.name, Number(plan.price) || 0);
+  if (paid && user.referredBy) {
+    const ref = await getUser(kv, user.referredBy);
+    if (ref && ref.status !== 'banned') {
+      const commission = Number((amount * 0.2).toFixed(6));
+      if (commission > 0) {
+        ref.withdrawalBalance = Number((ref.withdrawalBalance + commission).toFixed(6));
+        ref.referralEarnings = Number(((ref.referralEarnings || 0) + commission).toFixed(6));
+        await saveUser(kv, ref);
+        await saveTx(kv, {
+          id: generateId('tx'),
+          userId: ref.id,
+          type: 'referral',
+          amount: commission,
+          status: 'completed',
+          description: `20% of ${user.username}'s ${plan.name} claim (${amount} USDT)`,
+          timestamp: now,
+          relatedUserId: user.id,
+        } as Transaction);
+        referralPaid = commission;
+      }
+    }
+  }
+
   const analytics = await getAnalytics(kv);
   analytics.totalYieldPaid = Number((analytics.totalYieldPaid + amount).toFixed(6));
   await saveAnalytics(kv, analytics);
@@ -115,6 +155,7 @@ export async function POST(req: NextRequest) {
     planName: plan.name,
     userPlanId: plan.userPlanId,
     withdrawalBalance: user.withdrawalBalance,
+    referralPaid,
     message: `Claimed ${amount} USDT from ${plan.name}`,
   });
 }

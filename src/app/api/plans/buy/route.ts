@@ -74,25 +74,8 @@ export async function POST(req: Request) {
     timestamp: now,
   } as Transaction);
 
-  if (user.referredBy && plan.price > 3) {
-    const ref = await getUser(kv, user.referredBy);
-    if (ref) {
-      const commission = Number((plan.price * 0.2).toFixed(6));
-      ref.withdrawalBalance = Number((ref.withdrawalBalance + commission).toFixed(6));
-      ref.referralEarnings = Number((ref.referralEarnings + commission).toFixed(6));
-      await saveUser(kv, ref);
-      await saveTx(kv, {
-        id: generateId('tx'),
-        userId: ref.id,
-        type: 'referral',
-        amount: commission,
-        status: 'completed',
-        description: `Referral commission from ${user.username}`,
-        timestamp: now,
-        relatedUserId: user.id,
-      } as Transaction);
-    }
-  }
+  // Referral commission is paid on paid-plan daily claims only (see /api/claim).
+  // No commission on plan purchase or deposits.
 
   const analytics = await getAnalytics(kv);
   analytics.paidUsersCount += 1;
