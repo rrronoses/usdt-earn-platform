@@ -121,7 +121,6 @@ export async function saveUser(kv: KVNamespace, user: User) {
 export async function deleteUser(kv: KVNamespace, userId: string): Promise<boolean> {
   const user = await getUser(kv, userId);
   if (!user) {
-    // Still try delete key in case of partial state
     await kv.delete(keys.user(userId));
     await kv.delete(keys.userPlans(userId));
     return false;
@@ -129,12 +128,10 @@ export async function deleteUser(kv: KVNamespace, userId: string): Promise<boole
 
   await kv.delete(keys.email(user.email));
   await kv.delete(keys.username(user.username));
-  // Also clear possible deleted_* email from soft-delete attempts
   await kv.delete(keys.email(`deleted_${user.id}@removed.local`));
 
   await kv.delete(keys.user(userId));
   await kv.delete(keys.userPlans(userId));
-  // Keep user_tx index + tx records for audit trail
 
   const analytics = await getAnalytics(kv);
   if (analytics.totalUsers > 0) {
@@ -263,7 +260,8 @@ export async function listPendingWithdrawals(kv: KVNamespace) {
 }
 
 export async function getConfig(kv: KVNamespace) {
-  return (await getJSON<SystemConfig>(kv, keys.config())) || DEFAULT_CONFIG;
+  const stored = await getJSON<Partial<SystemConfig>>(kv, keys.config());
+  return { ...DEFAULT_CONFIG, ...(stored || {}) } as SystemConfig;
 }
 
 export async function saveConfig(kv: KVNamespace, cfg: SystemConfig) {
