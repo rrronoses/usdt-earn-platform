@@ -32,6 +32,8 @@ export async function POST(req: Request) {
   if (body.maxDepositLimit !== undefined) cfg.maxDepositLimit = Math.max(cfg.minDepositLimit || 0, Number(body.maxDepositLimit));
   if (body.depositExpiryMinutes !== undefined) cfg.depositExpiryMinutes = Math.max(1, Number(body.depositExpiryMinutes));
   if (body.withdrawalNote !== undefined) cfg.withdrawalNote = String(body.withdrawalNote);
+  if (body.supportTelegram !== undefined) cfg.supportTelegram = String(body.supportTelegram).trim();
+  if (body.supportEmail !== undefined) cfg.supportEmail = String(body.supportEmail).trim();
   await saveConfig(kv, cfg);
   const { adminPasswordHash: _, ...safe } = cfg;
   return NextResponse.json({ ok: true, config: safe });

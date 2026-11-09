@@ -10,6 +10,8 @@ export default function AdminSettingsPage() {
     maxDepositLimit: 10000,
     depositExpiryMinutes: 30,
     withdrawalNote: '',
+    supportTelegram: '',
+    supportEmail: '',
   });
   const [msg, setMsg] = useState('');
   const [saving, setSaving] = useState(false);
@@ -33,7 +35,7 @@ export default function AdminSettingsPage() {
     setSaving(false);
   }
 
-  const fields: { key: keyof typeof cfg; label: string; type?: string }[] = [
+  const fields: { key: 'minWithdrawalLimit' | 'minDepositLimit' | 'maxDepositLimit' | 'depositExpiryMinutes'; label: string }[] = [
     { key: 'minWithdrawalLimit', label: 'Min withdrawal (USDT)' },
     { key: 'minDepositLimit', label: 'Min deposit (USDT)' },
     { key: 'maxDepositLimit', label: 'Max deposit (USDT)' },
@@ -41,17 +43,19 @@ export default function AdminSettingsPage() {
   ];
 
   return (
-    <AdminShell title="Settings" subtitle="Platform limits and user-facing notes">
+    <AdminShell title="Settings" subtitle="Platform limits, support contacts, and notes">
       {msg && (
-        <div className="mb-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-300 text-sm">
+        <div className="mb-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-500 text-sm">
           {msg}
         </div>
       )}
 
-      <div className="max-w-lg space-y-4 rounded-2xl border border-white/10 bg-slate-900/50 p-5 sm:p-6">
+      <div className="max-w-lg space-y-4 panel-card p-5 sm:p-6">
         {fields.map((f) => (
           <label key={f.key} className="block">
-            <span className="text-xs font-medium uppercase tracking-wide text-slate-400">{f.label}</span>
+            <span className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--muted)' }}>
+              {f.label}
+            </span>
             <input
               type="number"
               value={cfg[f.key] as number}
@@ -60,14 +64,44 @@ export default function AdminSettingsPage() {
             />
           </label>
         ))}
+
         <label className="block">
-          <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Withdrawal note</span>
+          <span className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--muted)' }}>
+            Support Telegram link
+          </span>
+          <input
+            type="url"
+            value={cfg.supportTelegram}
+            onChange={(e) => setCfg({ ...cfg, supportTelegram: e.target.value })}
+            placeholder="https://t.me/your_channel"
+            className="input-field mt-1.5"
+          />
+        </label>
+
+        <label className="block">
+          <span className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--muted)' }}>
+            Support email
+          </span>
+          <input
+            type="email"
+            value={cfg.supportEmail}
+            onChange={(e) => setCfg({ ...cfg, supportEmail: e.target.value })}
+            placeholder="support@example.com"
+            className="input-field mt-1.5"
+          />
+        </label>
+
+        <label className="block">
+          <span className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--muted)' }}>
+            Withdrawal note
+          </span>
           <textarea
             value={cfg.withdrawalNote}
             onChange={(e) => setCfg({ ...cfg, withdrawalNote: e.target.value })}
             className="input-field mt-1.5 min-h-[100px] resize-y"
           />
         </label>
+
         <button onClick={save} disabled={saving} className="btn-primary w-full py-3.5">
           {saving ? 'Saving…' : 'Save settings'}
         </button>

@@ -16,6 +16,8 @@ export async function GET() {
       depositNetwork: config.depositNetwork,
       depositExpiryMinutes: config.depositExpiryMinutes,
       withdrawalNote: config.withdrawalNote,
+      supportTelegram: config.supportTelegram || '',
+      supportEmail: config.supportEmail || '',
     },
     plans: plans.filter((p) => p.active),
   });

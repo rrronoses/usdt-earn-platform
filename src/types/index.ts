@@ -92,6 +92,8 @@ export interface SystemConfig {
   depositNetwork: string;
   depositExpiryMinutes: number;
   withdrawalNote: string;
+  supportTelegram: string;
+  supportEmail: string;
   adminUsername: string;
   adminPasswordHash: string;
 }
@@ -120,6 +122,8 @@ export const DEFAULT_CONFIG: SystemConfig = {
   depositNetwork: 'TRC20',
   depositExpiryMinutes: 30,
   withdrawalNote: 'Withdrawals are processed within 2-3 hours following administrative review.',
+  supportTelegram: 'https://t.me/',
+  supportEmail: 'support@usdtearn.pages.dev',
   adminUsername: 'admin',
   adminPasswordHash: 'admin123',
 };

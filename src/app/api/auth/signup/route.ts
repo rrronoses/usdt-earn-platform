@@ -60,12 +60,14 @@ export async function POST(req: Request) {
     const id = generateUserId();
     const now = new Date().toISOString();
 
+    // Signup reward = free Bronze plan only (price 3 USDT applied as plan).
+    // Do NOT also credit 3 USDT deposit balance.
     const user: User = {
       id,
       username,
       email,
       passwordHash: hashPassword(password),
-      depositBalance: 3,
+      depositBalance: 0,
       withdrawalBalance: 0,
       todayEarnings: 0,
       lastClaimDate: null,
@@ -107,9 +109,9 @@ export async function POST(req: Request) {
       id: generateId('tx'),
       userId: id,
       type: 'signup_bonus',
-      amount: 3,
+      amount: 0,
       status: 'completed',
-      description: 'Welcome bonus + free Bronze plan',
+      description: 'Free Bronze plan on signup (7 days · 1 USDT/day)',
       timestamp: now,
     };
     await saveTx(kv, tx);
@@ -120,7 +122,7 @@ export async function POST(req: Request) {
 
     const token = createToken(id, 'user');
     const res = jsonOk({
-      message: 'Account created! Free 3 USDT Bronze plan assigned.',
+      message: 'Account created! Free Bronze plan assigned.',
       user: { id, username, email },
     });
     res.cookies.set(userCookieOptions(token));
