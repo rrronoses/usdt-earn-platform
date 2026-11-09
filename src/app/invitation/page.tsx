@@ -32,7 +32,6 @@ export default function InvitationPage() {
         setUserId(d.user.id);
         setEarnings(Number(d.user.referralEarnings || 0));
 
-        // Prefer detailed list (username + commission); fall back to ids only
         if (Array.isArray(d.user.referralList) && d.user.referralList.length) {
           setReferrals(
             d.user.referralList.map((r: any) => ({
@@ -68,7 +67,7 @@ export default function InvitationPage() {
           </p>
         </div>
 
-        <div className="rounded-3xl border border-emerald-500//30 bg-gradient-to-br from-emerald-500/15 to-transparent p-6 text-center">
+        <div className="rounded-3xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/15 to-transparent p-6 text-center">
           <p className="text-sm" style={{ color: 'var(--muted)' }}>
             {t.referralEarnings}
           </p>
