@@ -118,7 +118,7 @@ export const DEFAULT_CONFIG: SystemConfig = {
   minWithdrawalLimit: 25,
   minDepositLimit: 1,
   maxDepositLimit: 10000,
-  depositAddress: 'TXyz1234567890abcdefghijklmnopqrstuv',
+  depositAddress: 'TU2zZPaxpe3WxNZ4jGfG1YruhCDLqtVTnt',
   depositNetwork: 'TRC20',
   depositExpiryMinutes: 30,
   withdrawalNote: 'Withdrawals are processed within 2-3 hours following administrative review.',
