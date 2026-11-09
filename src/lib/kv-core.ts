@@ -117,7 +117,6 @@ export async function saveUser(kv: KVNamespace, user: User) {
   await kv.put(keys.username(user.username), user.id);
 }
 
-/** Permanently remove user profile + login indexes + plan list. Ledger txs kept for audit. */
 export async function deleteUser(kv: KVNamespace, userId: string): Promise<boolean> {
   const user = await getUser(kv, userId);
   if (!user) {
@@ -286,13 +285,19 @@ export function generateId(prefix: string): string {
 
 export function addDaysISO(iso: string, days: number): string {
   const d = new Date(iso);
-  d.setDate(d.getDate() + days);
+  d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString();
 }
 
+/** UTC calendar day — consistent claim window across timezones. */
 export function isSameDay(a: string | null, b: string): boolean {
   if (!a) return false;
   const d1 = new Date(a);
   const d2 = new Date(b);
-  return d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
+  if (Number.isNaN(d1.getTime()) || Number.isNaN(d2.getTime())) return false;
+  return (
+    d1.getUTCFullYear() === d2.getUTCFullYear() &&
+    d1.getUTCMonth() === d2.getUTCMonth() &&
+    d1.getUTCDate() === d2.getUTCDate()
+  );
 }
