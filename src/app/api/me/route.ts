@@ -1,6 +1,13 @@
 import { NextResponse } from 'next/server';
 import { getStorage } from '@/lib/memory-kv';
-import { ensureSeeded, getUser, getUserPlans, getUserTransactions, getConfig, listPlans } from '@/lib/kv';
+import {
+  ensureSeeded,
+  getUser,
+  getUserPlans,
+  getUserTransactions,
+  getConfig,
+  listPlans,
+} from '@/lib/kv';
 import { getUserToken, parseToken } from '@/lib/auth';
 
 export const runtime = 'edge';
@@ -21,6 +28,32 @@ export async function GET() {
   const config = await getConfig(kv);
   const catalog = await listPlans(kv);
 
+  // Build per-referral breakdown: username + commission earned from that user
+  const referralIds = Array.isArray(user.referrals) ? user.referrals : [];
+  const commissionByRelated: Record<string, number> = {};
+  for (const tx of transactions) {
+    if (tx.type !== 'referral' || !tx.relatedUserId) continue;
+    const rid = String(tx.relatedUserId);
+    commissionByRelated[rid] = Number(
+      ((commissionByRelated[rid] || 0) + (Number(tx.amount) || 0)).toFixed(6)
+    );
+  }
+
+  const referralList: {
+    userId: string;
+    username: string;
+    commissionEarned: number;
+  }[] = [];
+
+  for (const rid of referralIds) {
+    const refUser = await getUser(kv, rid);
+    referralList.push({
+      userId: rid,
+      username: refUser?.username || `User ${rid.slice(0, 6)}`,
+      commissionEarned: commissionByRelated[rid] || 0,
+    });
+  }
+
   return NextResponse.json({
     ok: true,
     user: {
@@ -34,6 +67,7 @@ export async function GET() {
       referralCode: user.referralCode,
       referralEarnings: user.referralEarnings,
       referrals: user.referrals,
+      referralList,
       status: user.status,
       createdAt: user.createdAt,
       avatarSeed: user.avatarSeed,

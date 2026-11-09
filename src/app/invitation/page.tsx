@@ -5,12 +5,18 @@ import { useRouter } from 'next/navigation';
 import { UserNav } from '@/components/UserNav';
 import { useThemeLang } from '@/components/ThemeLangProvider';
 
+type ReferralRow = {
+  userId: string;
+  username: string;
+  commissionEarned: number;
+};
+
 export default function InvitationPage() {
   const router = useRouter();
   const { t } = useThemeLang();
   const [userId, setUserId] = useState('');
   const [earnings, setEarnings] = useState(0);
-  const [referrals, setReferrals] = useState<string[]>([]);
+  const [referrals, setReferrals] = useState<ReferralRow[]>([]);
   const [copied, setCopied] = useState(false);
   const [origin, setOrigin] = useState('');
 
@@ -24,8 +30,27 @@ export default function InvitationPage() {
           return;
         }
         setUserId(d.user.id);
-        setEarnings(d.user.referralEarnings || 0);
-        setReferrals(d.user.referrals || []);
+        setEarnings(Number(d.user.referralEarnings || 0));
+
+        // Prefer detailed list (username + commission); fall back to ids only
+        if (Array.isArray(d.user.referralList) && d.user.referralList.length) {
+          setReferrals(
+            d.user.referralList.map((r: any) => ({
+              userId: String(r.userId || ''),
+              username: String(r.username || 'User'),
+              commissionEarned: Number(r.commissionEarned || 0),
+            }))
+          );
+        } else {
+          const ids: string[] = d.user.referrals || [];
+          setReferrals(
+            ids.map((id) => ({
+              userId: id,
+              username: `User ${String(id).slice(0, 6)}`,
+              commissionEarned: 0,
+            }))
+          );
+        }
       });
   }, [router]);
 
@@ -43,7 +68,7 @@ export default function InvitationPage() {
           </p>
         </div>
 
-        <div className="rounded-3xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/15 to-transparent p-6 text-center">
+        <div className="rounded-3xl border border-emerald-500//30 bg-gradient-to-br from-emerald-500/15 to-transparent p-6 text-center">
           <p className="text-sm" style={{ color: 'var(--muted)' }}>
             {t.referralEarnings}
           </p>
@@ -90,7 +115,7 @@ export default function InvitationPage() {
           </button>
           <div className="flex items-center justify-between text-xs pt-1" style={{ color: 'var(--muted)' }}>
             <span>
-              User ID:{' '}
+              Your referral code:{' '}
               <strong className="text-emerald-500 font-mono">{userId || '—'}</strong>
             </span>
             <button
@@ -98,25 +123,54 @@ export default function InvitationPage() {
               onClick={() => userId && navigator.clipboard.writeText(userId)}
               className="text-emerald-500 font-medium"
             >
-              Copy ID
+              Copy
             </button>
           </div>
         </div>
 
         <div className="panel-card overflow-hidden">
-          <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border)' }}>
+          <div
+            className="px-4 py-3 border-b flex items-center justify-between gap-2"
+            style={{ borderColor: 'var(--border)' }}
+          >
             <h2 className="font-semibold">Referred users</h2>
+            <span className="text-xs" style={{ color: 'var(--muted)' }}>
+              Commission earned
+            </span>
           </div>
           {referrals.length === 0 ? (
             <p className="p-6 text-center text-sm" style={{ color: 'var(--muted)' }}>
               Share your link — referrals appear here when they sign up.
             </p>
           ) : (
-            <ul className="divide-y max-h-64 overflow-y-auto" style={{ borderColor: 'var(--border)' }}>
-              {referrals.map((id, i) => (
-                <li key={id} className="px-4 py-3 flex items-center justify-between text-sm">
-                  <span style={{ color: 'var(--muted)' }}>#{i + 1}</span>
-                  <code className="font-mono text-emerald-500">{id}</code>
+            <ul className="divide-y max-h-80 overflow-y-auto" style={{ borderColor: 'var(--border)' }}>
+              {referrals.map((row, i) => (
+                <li
+                  key={row.userId || i}
+                  className="px-4 py-3 flex items-center justify-between gap-3 text-sm"
+                >
+                  <div className="min-w-0 flex items-center gap-3">
+                    <span
+                      className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+                      style={{ background: 'var(--border)', color: 'var(--text)' }}
+                    >
+                      {(row.username || '?').slice(0, 1).toUpperCase()}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="font-semibold truncate">{row.username}</p>
+                      <p className="text-[11px]" style={{ color: 'var(--muted)' }}>
+                        #{i + 1}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="font-mono font-bold text-emerald-500">
+                      +{Number(row.commissionEarned || 0).toFixed(2)}
+                    </p>
+                    <p className="text-[10px] uppercase" style={{ color: 'var(--muted)' }}>
+                      USDT
+                    </p>
+                  </div>
                 </li>
               ))}
             </ul>
