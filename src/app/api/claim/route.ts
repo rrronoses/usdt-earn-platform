@@ -17,14 +17,10 @@ import type { Transaction } from '@/types';
 
 export const runtime = 'edge';
 
-/** Paid plan ids eligible for referral commission on daily claims. */
-function isPaidPlan(planId: string, planName: string, price: number): boolean {
+function isPaidPlan(planId: string, planName: string): boolean {
   const id = (planId || '').toLowerCase();
-  if (id === 'bronze') return false;
-  // Free bronze is signup-only; never pay referral on its claims
-  if (price > 0 && price <= 3 && id.includes('bronze')) return false;
-  // Any non-bronze active claim from a purchased tier
-  if (id === 'bronze' || planName.toLowerCase() === 'bronze') return false;
+  const name = (planName || '').toLowerCase();
+  if (id === 'bronze' || name === 'bronze') return false;
   return true;
 }
 
@@ -32,8 +28,7 @@ function isPaidPlan(planId: string, planName: string, price: number): boolean {
  * Claim daily earn for ONE purchased plan.
  * Body: { userPlanId: string }
  *
- * Referral: 20% of this claim goes to referrer ONLY when the claimed plan is a paid plan
- * (not free Bronze). No commission on deposits or plan purchases.
+ * Referral: 20% of this claim to referrer ONLY for paid plans (not free Bronze).
  */
 export async function POST(req: NextRequest) {
   const token = getUserToken();
@@ -82,7 +77,13 @@ export async function POST(req: NextRequest) {
 
   if (isSameDay(plan.lastClaimedAt, now)) {
     return NextResponse.json(
-      { ok: false, message: `Already claimed ${plan.name} today. Come back tomorrow.` },
+      {
+        ok: false,
+        alreadyClaimed: true,
+        lastClaimedAt: plan.lastClaimedAt,
+        userPlanId: plan.userPlanId,
+        message: `Already claimed ${plan.name} today. Come back tomorrow.`,
+      },
       { status: 400 }
     );
   }
@@ -92,11 +93,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, message: 'Invalid plan earn amount' }, { status: 400 });
   }
 
-  plans[idx] = {
+  const updatedPlan = {
     ...plan,
     lastClaimedAt: now,
     claimedDays: (plan.claimedDays || 0) + 1,
   };
+  plans[idx] = updatedPlan;
 
   user.withdrawalBalance = Number((user.withdrawalBalance + amount).toFixed(6));
   if (isSameDay(user.lastClaimDate, now)) {
@@ -106,8 +108,8 @@ export async function POST(req: NextRequest) {
   }
   user.lastClaimDate = now;
 
-  await saveUser(kv, user);
   await saveUserPlans(kv, user.id, plans);
+  await saveUser(kv, user);
 
   await saveTx(kv, {
     id: generateId('tx'),
@@ -119,10 +121,8 @@ export async function POST(req: NextRequest) {
     timestamp: now,
   } as Transaction);
 
-  // 20% referral on paid-plan daily claims only (exclude free Bronze)
   let referralPaid = 0;
-  const paid = isPaidPlan(plan.planId, plan.name, Number(plan.price) || 0);
-  if (paid && user.referredBy) {
+  if (isPaidPlan(plan.planId, plan.name) && user.referredBy) {
     const ref = await getUser(kv, user.referredBy);
     if (ref && ref.status !== 'banned') {
       const commission = Number((amount * 0.2).toFixed(6));
@@ -154,7 +154,9 @@ export async function POST(req: NextRequest) {
     claimed: amount,
     planName: plan.name,
     userPlanId: plan.userPlanId,
+    lastClaimedAt: now,
     withdrawalBalance: user.withdrawalBalance,
+    todayEarnings: user.todayEarnings,
     referralPaid,
     message: `Claimed ${amount} USDT from ${plan.name}`,
   });

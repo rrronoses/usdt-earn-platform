@@ -9,6 +9,7 @@ import {
   setActiveDepositAddress,
 } from '@/lib/kv-deposit';
 import { getAdminToken, parseToken } from '@/lib/auth';
+import { isValidTronAddress, normalizeTronAddress } from '@/lib/tron';
 
 export const runtime = 'edge';
 
@@ -37,48 +38,74 @@ export async function POST(req: Request) {
   const body: any = await req.json().catch(() => ({}));
   const action = String(body.action || 'add');
 
-  if (action === 'add') {
-    const address = String(body.address || '').trim();
-    const label = body.label ? String(body.label) : 'USDT TRC20';
-    const setActive = body.setActive !== false;
-    if (!address) return NextResponse.json({ ok: false, message: 'Address required' }, { status: 400 });
-    // TRON base58 addresses start with T and are 34 chars typically
-    if (!/^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(address)) {
-      return NextResponse.json({ ok: false, message: 'Invalid TRON/TRC-20 address' }, { status: 400 });
+  try {
+    if (action === 'add') {
+      const address = normalizeTronAddress(String(body.address || ''));
+      const label = body.label ? String(body.label) : 'USDT TRC20';
+      const setActive = body.setActive !== false;
+      if (!address) {
+        return NextResponse.json({ ok: false, message: 'Address required' }, { status: 400 });
+      }
+      if (!isValidTronAddress(address)) {
+        return NextResponse.json(
+          {
+            ok: false,
+            message:
+              'Invalid TRON/TRC-20 address. Must start with T and be 34 characters (base58).',
+          },
+          { status: 400 }
+        );
+      }
+      const list = await addDepositAddress(kv, {
+        network: 'TRC20',
+        address,
+        label,
+        active: setActive,
+      });
+      if (setActive) {
+        const added = list.find((a) => a.address === address) || list[list.length - 1];
+        if (added) await setActiveDepositAddress(kv, added.id);
+      }
+      return NextResponse.json({ ok: true, addresses: await listDepositAddresses(kv) });
     }
-    const list = await addDepositAddress(kv, { network: 'TRC20', address, label, active: setActive });
-    if (setActive) {
-      const added = list[list.length - 1];
-      if (added) await setActiveDepositAddress(kv, added.id);
+
+    if (action === 'update') {
+      const id = String(body.id || '');
+      if (!id) return NextResponse.json({ ok: false, message: 'id required' }, { status: 400 });
+      const patch: Record<string, unknown> = {};
+      if (body.address !== undefined) {
+        const address = normalizeTronAddress(String(body.address));
+        if (!isValidTronAddress(address)) {
+          return NextResponse.json({ ok: false, message: 'Invalid TRON/TRC-20 address' }, { status: 400 });
+        }
+        patch.address = address;
+      }
+      if (body.label !== undefined) patch.label = String(body.label);
+      if (body.active !== undefined) patch.active = Boolean(body.active);
+      if (body.network !== undefined) patch.network = 'TRC20';
+      await updateDepositAddress(kv, id, patch as any);
+      return NextResponse.json({ ok: true, addresses: await listDepositAddresses(kv) });
     }
-    return NextResponse.json({ ok: true, addresses: await listDepositAddresses(kv) });
-  }
 
-  if (action === 'update') {
-    const id = String(body.id || '');
-    if (!id) return NextResponse.json({ ok: false, message: 'id required' }, { status: 400 });
-    const patch: Record<string, unknown> = {};
-    if (body.address !== undefined) patch.address = String(body.address).trim();
-    if (body.label !== undefined) patch.label = String(body.label);
-    if (body.active !== undefined) patch.active = Boolean(body.active);
-    if (body.network !== undefined) patch.network = String(body.network);
-    await updateDepositAddress(kv, id, patch as any);
-    return NextResponse.json({ ok: true, addresses: await listDepositAddresses(kv) });
-  }
+    if (action === 'remove') {
+      const id = String(body.id || '');
+      if (!id) return NextResponse.json({ ok: false, message: 'id required' }, { status: 400 });
+      await removeDepositAddress(kv, id);
+      return NextResponse.json({ ok: true, addresses: await listDepositAddresses(kv) });
+    }
 
-  if (action === 'remove') {
-    const id = String(body.id || '');
-    if (!id) return NextResponse.json({ ok: false, message: 'id required' }, { status: 400 });
-    await removeDepositAddress(kv, id);
-    return NextResponse.json({ ok: true, addresses: await listDepositAddresses(kv) });
-  }
+    if (action === 'setActive') {
+      const id = String(body.id || '');
+      if (!id) return NextResponse.json({ ok: false, message: 'id required' }, { status: 400 });
+      await setActiveDepositAddress(kv, id);
+      return NextResponse.json({ ok: true, addresses: await listDepositAddresses(kv) });
+    }
 
-  if (action === 'setActive') {
-    const id = String(body.id || '');
-    if (!id) return NextResponse.json({ ok: false, message: 'id required' }, { status: 400 });
-    await setActiveDepositAddress(kv, id);
-    return NextResponse.json({ ok: true, addresses: await listDepositAddresses(kv) });
+    return NextResponse.json({ ok: false, message: 'Unknown action' }, { status: 400 });
+  } catch (e) {
+    return NextResponse.json(
+      { ok: false, message: e instanceof Error ? e.message : 'Failed' },
+      { status: 400 }
+    );
   }
-
-  return NextResponse.json({ ok: false, message: 'Unknown action' }, { status: 400 });
 }

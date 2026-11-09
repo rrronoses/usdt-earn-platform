@@ -6,13 +6,14 @@ import { useRouter } from 'next/navigation';
 import { UserNav } from '@/components/UserNav';
 import { useThemeLang } from '@/components/ThemeLangProvider';
 
-function sameDay(a: string | null | undefined, b = new Date()) {
+function sameUtcDay(a: string | null | undefined, b = new Date()) {
   if (!a) return false;
   const d = new Date(a);
+  if (Number.isNaN(d.getTime())) return false;
   return (
-    d.getFullYear() === b.getFullYear() &&
-    d.getMonth() === b.getMonth() &&
-    d.getDate() === b.getDate()
+    d.getUTCFullYear() === b.getUTCFullYear() &&
+    d.getUTCMonth() === b.getUTCMonth() &&
+    d.getUTCDate() === b.getUTCDate()
   );
 }
 
@@ -22,6 +23,8 @@ export default function DashboardPage() {
   const [data, setData] = useState<any>(null);
   const [msg, setMsg] = useState('');
   const [claimingId, setClaimingId] = useState<string | null>(null);
+  /** Local override so button updates immediately after claim (KV lag safe) */
+  const [claimedOverride, setClaimedOverride] = useState<Record<string, string>>({});
 
   const loadMe = useCallback(() => {
     return fetch('/api/me')
@@ -50,8 +53,36 @@ export default function DashboardPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userPlanId }),
       }).then((r) => r.json());
+
       setMsg(d.message || (d.ok ? `Claimed ${d.claimed} USDT from ${planName}` : 'Claim failed'));
-      if (d.ok) loadMe();
+
+      // Always lock the button for this plan if claimed now or already claimed today
+      if (d.ok || d.alreadyClaimed) {
+        const at = d.lastClaimedAt || new Date().toISOString();
+        setClaimedOverride((prev) => ({ ...prev, [userPlanId]: at }));
+        setData((prev: any) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            user: prev.user
+              ? {
+                  ...prev.user,
+                  withdrawalBalance:
+                    d.withdrawalBalance ?? prev.user.withdrawalBalance,
+                  todayEarnings: d.todayEarnings ?? prev.user.todayEarnings,
+                  totalBalance:
+                    (prev.user.depositBalance || 0) +
+                    (d.withdrawalBalance ?? prev.user.withdrawalBalance || 0),
+                }
+              : prev.user,
+            plans: (prev.plans || []).map((p: any) =>
+              p.userPlanId === userPlanId ? { ...p, lastClaimedAt: at } : p
+            ),
+          };
+        });
+        // Refresh from server shortly after (eventual consistency)
+        setTimeout(() => loadMe(), 800);
+      }
     } catch {
       setMsg('Network error');
     }
@@ -70,7 +101,13 @@ export default function DashboardPage() {
   const activePlans = (plans || []).filter(
     (p: any) => p.status === 'active' && new Date(p.expiryDate) > new Date()
   );
-  const claimableToday = activePlans.filter((p: any) => !sameDay(p.lastClaimedAt));
+
+  function planClaimedToday(p: any) {
+    const override = claimedOverride[p.userPlanId];
+    return sameUtcDay(override || p.lastClaimedAt);
+  }
+
+  const claimableToday = activePlans.filter((p: any) => !planClaimedToday(p));
   const dailyPotential = claimableToday.reduce(
     (sum: number, p: any) => sum + (Number(p.dailyYield) || 0),
     0
@@ -81,103 +118,79 @@ export default function DashboardPage() {
       <div className="fixed inset-0 pointer-events-none overflow-hidden mesh-bg" />
       <UserNav />
       <main className="max-w-lg mx-auto px-4 py-5 space-y-4 relative z-10">
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-xs" style={{ color: 'var(--muted)' }}>
-              {t.welcome}
-            </p>
-            <p className="font-bold text-lg truncate">{user.username}</p>
-          </div>
-          <Link
-            href="/plans"
-            className="shrink-0 text-xs font-bold px-3.5 py-2 rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 shadow-lg shadow-emerald-500/30"
-          >
-            {t.buyPlan} →
-          </Link>
+        <div>
+          <p className="text-sm" style={{ color: 'var(--muted)' }}>
+            {t.welcome}
+          </p>
+          <h1 className="text-2xl font-black tracking-tight">{user.username}</h1>
         </div>
 
         {msg && (
-          <div className="p-3.5 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 text-sm text-center">
+          <div className="p-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 text-sm text-center">
             {msg}
           </div>
         )}
 
-        <div className="rounded-[1.75rem] bg-gradient-to-br from-emerald-500/30 via-teal-600/15 to-transparent border border-emerald-400/30 p-5 shadow-xl shadow-emerald-500/15">
-          <p className="text-sm" style={{ color: 'var(--muted)' }}>
-            {t.totalBalance}
-          </p>
-          <p className="text-4xl font-black tracking-tight mt-1">
-            {user.totalBalance.toFixed(2)}
-            <span className="text-base font-semibold text-emerald-500 ml-1.5">USDT</span>
-          </p>
-          <div className="grid grid-cols-3 gap-2 mt-4">
-            {[
-              { label: t.deposit, value: user.depositBalance },
-              { label: t.withdraw, value: user.withdrawalBalance },
-              { label: t.today, value: user.todayEarnings, plus: true },
-            ].map((c) => (
-              <div key={c.label} className="rounded-2xl p-3 text-center panel-card">
-                <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--muted)' }}>
-                  {c.label}
-                </p>
-                <p className={`font-bold text-sm mt-0.5 ${c.plus ? 'text-emerald-500' : ''}`}>
-                  {c.plus ? '+' : ''}
-                  {Number(c.value).toFixed(2)}
-                </p>
-              </div>
-            ))}
-          </div>
+        <div className="grid grid-cols-2 gap-3">
+          {[
+            { label: t.totalBalance, value: Number(user.totalBalance || 0).toFixed(2) },
+            { label: t.deposit, value: Number(user.depositBalance || 0).toFixed(2) },
+            { label: t.withdraw, value: Number(user.withdrawalBalance || 0).toFixed(2) },
+            { label: t.today, value: Number(user.todayEarnings || 0).toFixed(2) },
+          ].map((c) => (
+            <div key={c.label} className="panel-card p-3.5">
+              <p className="text-[11px] uppercase tracking-wide" style={{ color: 'var(--muted)' }}>
+                {c.label}
+              </p>
+              <p className="text-xl font-black text-emerald-500 mt-1">{c.value}</p>
+            </div>
+          ))}
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
-          <Link href="/deposit" className="btn-primary text-center text-sm py-3">
+        <div className="grid grid-cols-2 gap-3">
+          <Link href="/deposit" className="btn-primary text-center py-3">
             {t.deposit}
           </Link>
-          <Link href="/withdraw" className="btn-ghost text-center text-sm py-3">
+          <Link href="/withdraw" className="btn-ghost text-center py-3">
             {t.withdraw}
           </Link>
         </div>
 
         <div>
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="font-semibold">{t.activePlans}</h2>
-            <Link href="/plans" className="text-xs font-semibold text-emerald-500">
-              + {t.buyPlan}
-            </Link>
-          </div>
-
+          <h2 className="font-semibold mb-2">{t.activePlans}</h2>
           {activePlans.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-emerald-500/30 bg-emerald-500/5 p-6 text-center">
-              <p className="text-sm font-medium mb-1">No active plans</p>
-              <Link href="/plans" className="inline-flex mt-2 px-5 py-2.5 rounded-xl btn-primary text-sm">
-                Browse plans
+            <div className="panel-card p-4 text-center text-sm" style={{ color: 'var(--muted)' }}>
+              No active plans.{' '}
+              <Link href="/plans" className="text-emerald-500 font-semibold">
+                {t.buyPlan}
               </Link>
             </div>
           ) : (
             <div className="space-y-3">
               {activePlans.map((p: any) => {
-                const claimedToday = sameDay(p.lastClaimedAt);
+                const claimedToday = planClaimedToday(p);
                 const isClaiming = claimingId === p.userPlanId;
                 return (
                   <div key={p.userPlanId} className="panel-card p-4 space-y-3">
-                    <div className="flex justify-between items-start gap-3">
+                    <div className="flex justify-between gap-3">
                       <div>
                         <p className="font-bold text-lg">{p.name}</p>
-                        <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>
-                          Expires {new Date(p.expiryDate).toLocaleDateString()}
+                        <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>
+                          Daily {p.dailyYield} USDT · expires{' '}
+                          {new Date(p.expiryDate).toLocaleDateString()}
                         </p>
                       </div>
-                      <div className="text-right shrink-0">
-                        <p className="text-xl font-black text-emerald-500">+{p.dailyYield}</p>
+                      <div className="text-right">
+                        <p className="text-emerald-500 font-black text-xl">{p.dailyYield}</p>
                         <p className="text-[10px] uppercase" style={{ color: 'var(--muted)' }}>
-                          USDT / day
+                          / day
                         </p>
                       </div>
                     </div>
                     <button
                       onClick={() => claimPlan(p.userPlanId, p.name)}
                       disabled={claimedToday || isClaiming}
-                      className={`w-full py-3 rounded-xl font-bold transition disabled:opacity-50 ${
+                      className={`w-full py-3 rounded-xl font-bold transition disabled:opacity-60 disabled:cursor-not-allowed ${
                         claimedToday ? 'btn-ghost' : 'btn-primary'
                       }`}
                     >
@@ -195,6 +208,11 @@ export default function DashboardPage() {
           {claimableToday.length > 0 && (
             <p className="text-xs text-center mt-2" style={{ color: 'var(--muted)' }}>
               {claimableToday.length} ready · up to {dailyPotential.toFixed(2)} USDT
+            </p>
+          )}
+          {claimableToday.length === 0 && activePlans.length > 0 && (
+            <p className="text-xs text-center mt-2 text-emerald-600">
+              All active plans claimed for today
             </p>
           )}
         </div>

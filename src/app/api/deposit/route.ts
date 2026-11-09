@@ -13,6 +13,7 @@ import {
 } from '@/lib/kv';
 import { getUserToken, parseToken } from '@/lib/auth';
 import { rateLimit } from '@/lib/rate-limit';
+import { isValidTronAddress, normalizeTronAddress, USDT_TRC20_MAINNET } from '@/lib/tron';
 import type { DepositRequest, DepositWatch, Transaction } from '@/types';
 import type { DepositCreateRequest } from '@/lib/api-types';
 
@@ -71,20 +72,39 @@ export async function POST(req: Request) {
   const pending = await listPendingDeposits(kv);
   const mine = pending.find((d) => d.userId === user.id && d.status === 'pending');
   if (mine) {
+    const addr = normalizeTronAddress(mine.address || '');
+    if (!isValidTronAddress(addr)) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message:
+            'Your pending deposit has an invalid address. Contact admin to fix the deposit pool, then try again.',
+          depositId: mine.id,
+        },
+        { status: 400 }
+      );
+    }
     return NextResponse.json({
-      ok: false,
-      message: 'You already have a pending deposit. Send funds or wait for confirmation.',
+      ok: true,
+      resume: true,
+      message: 'You already have a pending deposit. Send the exact amount to this address.',
       depositId: mine.id,
-      address: mine.address,
+      address: addr,
       network: 'TRC20',
+      contract: USDT_TRC20_MAINNET,
       amount: mine.amount,
     });
   }
 
-  const addr = await pickRandomDepositAddress(kv);
-  if (!addr?.address) {
+  const addrEntry = await pickRandomDepositAddress(kv);
+  const address = normalizeTronAddress(addrEntry?.address || '');
+  if (!addrEntry || !isValidTronAddress(address)) {
     return NextResponse.json(
-      { ok: false, message: 'No USDT TRC-20 deposit address configured. Contact admin.' },
+      {
+        ok: false,
+        message:
+          'No valid USDT TRC-20 deposit address in the pool. Admin must add a real T… wallet under Admin → Deposits and enable it.',
+      },
       { status: 400 }
     );
   }
@@ -97,7 +117,7 @@ export async function POST(req: Request) {
     userId: user.id,
     username: user.username,
     amount,
-    address: addr.address,
+    address,
     network: 'TRC20',
     status: 'pending',
     createdAt: now,
@@ -107,7 +127,7 @@ export async function POST(req: Request) {
   const watch: DepositWatch = {
     depositId: id,
     userId: user.id,
-    address: addr.address,
+    address,
     expectedAmount: amount,
     createdAt: now,
     status: 'pending',
@@ -122,16 +142,16 @@ export async function POST(req: Request) {
     status: 'pending',
     description: `Deposit request ${amount} USDT (TRC20)`,
     timestamp: now,
-    address: addr.address,
+    address,
   };
   await saveTx(kv, tx);
 
   return NextResponse.json({
     ok: true,
     depositId: id,
-    address: addr.address,
+    address,
     network: 'TRC20',
-    contract: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
+    contract: USDT_TRC20_MAINNET,
     amount,
     message:
       'Send exact USDT TRC-20 to this address. Balance credits after on-chain confirmation.',
