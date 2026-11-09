@@ -69,36 +69,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, message: `Maximum deposit is ${maxD} USDT` }, { status: 400 });
   }
 
-  const pending = await listPendingDeposits(kv);
-  const mine = pending.find((d) => d.userId === user.id && d.status === 'pending');
-  if (mine) {
-    const addr = normalizeTronAddress(mine.address || '');
-    if (!isValidTronAddress(addr)) {
-      return NextResponse.json(
-        {
-          ok: false,
-          message:
-            'Your pending deposit has an invalid address. Contact admin to fix the deposit pool, then try again.',
-          depositId: mine.id,
-        },
-        { status: 400 }
-      );
-    }
-    return NextResponse.json({
-      ok: true,
-      resume: true,
-      message: 'You already have a pending deposit. Send the exact amount to this address.',
-      depositId: mine.id,
-      address: addr,
-      network: 'TRC20',
-      contract: USDT_TRC20_MAINNET,
-      amount: mine.amount,
-    });
-  }
-
+  // Resolve a valid address from admin pool first
   const addrEntry = await pickRandomDepositAddress(kv);
-  const address = normalizeTronAddress(addrEntry?.address || '');
-  if (!addrEntry || !isValidTronAddress(address)) {
+  const poolAddress = normalizeTronAddress(addrEntry?.address || '');
+  if (!addrEntry || !isValidTronAddress(poolAddress)) {
     return NextResponse.json(
       {
         ok: false,
@@ -109,6 +83,37 @@ export async function POST(req: Request) {
     );
   }
 
+  const pending = await listPendingDeposits(kv);
+  const mine = pending.find((d) => d.userId === user.id && d.status === 'pending');
+
+  if (mine) {
+    const existingAddr = normalizeTronAddress(mine.address || '');
+
+    // Stuck deposit from earlier bug (empty / placeholder address) → cancel and create fresh
+    if (!isValidTronAddress(existingAddr)) {
+      const nowReject = new Date().toISOString();
+      await saveDeposit(kv, {
+        ...mine,
+        status: 'rejected',
+        processedAt: nowReject,
+        note: 'Auto-cancelled: invalid deposit address; user may create a new deposit',
+      });
+      // fall through to create a new deposit with pool address
+    } else {
+      // Valid pending deposit — resume (optionally refresh amount if user sent new amount)
+      return NextResponse.json({
+        ok: true,
+        resume: true,
+        message: 'You already have a pending deposit. Send the exact amount to this address.',
+        depositId: mine.id,
+        address: existingAddr,
+        network: 'TRC20',
+        contract: USDT_TRC20_MAINNET,
+        amount: mine.amount,
+      });
+    }
+  }
+
   const id = generateId('dep');
   const now = new Date().toISOString();
 
@@ -117,7 +122,7 @@ export async function POST(req: Request) {
     userId: user.id,
     username: user.username,
     amount,
-    address,
+    address: poolAddress,
     network: 'TRC20',
     status: 'pending',
     createdAt: now,
@@ -127,7 +132,7 @@ export async function POST(req: Request) {
   const watch: DepositWatch = {
     depositId: id,
     userId: user.id,
-    address,
+    address: poolAddress,
     expectedAmount: amount,
     createdAt: now,
     status: 'pending',
@@ -142,14 +147,14 @@ export async function POST(req: Request) {
     status: 'pending',
     description: `Deposit request ${amount} USDT (TRC20)`,
     timestamp: now,
-    address,
+    address: poolAddress,
   };
   await saveTx(kv, tx);
 
   return NextResponse.json({
     ok: true,
     depositId: id,
-    address,
+    address: poolAddress,
     network: 'TRC20',
     contract: USDT_TRC20_MAINNET,
     amount,

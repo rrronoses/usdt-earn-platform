@@ -14,6 +14,7 @@ export default function DepositPage() {
   const [depAmount, setDepAmount] = useState('');
   const [depInfo, setDepInfo] = useState<any>(null);
   const [msg, setMsg] = useState('');
+  const [loading, setLoading] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(0);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -83,22 +84,42 @@ export default function DepositPage() {
       setMsg('Enter a valid amount');
       return;
     }
-    const d: any = await fetch('/api/deposit', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ amount }),
-    }).then((r) => r.json());
-    if (!d.ok) {
-      setMsg(d.message || 'Failed');
-      if (d.depositId && d.address) {
-        setDepInfo({ address: d.address, amount: d.amount || amount, depositId: d.depositId });
-        startPolling(d.depositId);
+    setLoading(true);
+    setMsg('');
+    try {
+      const d: any = await fetch('/api/deposit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount }),
+      }).then((r) => r.json());
+
+      if (!d.ok) {
+        setMsg(d.message || 'Failed');
+        // Still show address if API returned one (resume edge cases)
+        if (d.depositId && d.address) {
+          setDepInfo({ address: d.address, amount: d.amount || amount, depositId: d.depositId });
+          startPolling(d.depositId);
+        }
+        return;
       }
-      return;
+
+      if (!d.address) {
+        setMsg(d.message || 'No deposit address returned. Ask admin to enable a TRC-20 wallet.');
+        return;
+      }
+
+      setDepInfo({ address: d.address, amount: d.amount || amount, depositId: d.depositId });
+      setMsg(
+        d.resume
+          ? 'Pending deposit resumed. Send the exact amount to the address below.'
+          : 'Send exact USDT on TRC-20 only to the address below.'
+      );
+      startPolling(d.depositId);
+    } catch {
+      setMsg('Network error');
+    } finally {
+      setLoading(false);
     }
-    setDepInfo({ address: d.address, amount: d.amount, depositId: d.depositId });
-    setMsg('Send exact USDT on TRC-20 only.');
-    startPolling(d.depositId);
   }
 
   if (!user) {
@@ -150,7 +171,9 @@ export default function DepositPage() {
         <div className="note-box space-y-2">
           <p className="font-bold text-amber-600 dark:text-amber-300">{t.depositNotes}</p>
           <ul className="list-disc pl-4 space-y-1.5" style={{ color: 'var(--muted)' }}>
-            <li>Only send <strong>USDT on TRON (TRC-20)</strong>. Other networks = permanent loss.</li>
+            <li>
+              Only send <strong>USDT on TRON (TRC-20)</strong>. Other networks = permanent loss.
+            </li>
             <li>Send the <strong>exact amount</strong> shown after you generate an address.</li>
             <li>
               Limits:{' '}
@@ -159,7 +182,9 @@ export default function DepositPage() {
               </strong>
             </li>
             <li>After sending, wait for on-chain confirmation (usually 1–3 minutes).</li>
-            <li>Use the 4:00 timer window, or tap <strong>Check chain now</strong>.</li>
+            <li>
+              Use the 4:00 timer window, or tap <strong>Check chain now</strong>.
+            </li>
             <li>Deposit balance is used to buy plans (not the same as withdrawal balance).</li>
           </ul>
         </div>
@@ -179,8 +204,8 @@ export default function DepositPage() {
                 placeholder={`Min ${minD}`}
                 className="input-field"
               />
-              <button onClick={startDeposit} className="btn-primary w-full">
-                {t.generateAddress}
+              <button onClick={startDeposit} disabled={loading} className="btn-primary w-full">
+                {loading ? 'Please wait…' : t.generateAddress}
               </button>
             </>
           ) : (
@@ -191,11 +216,16 @@ export default function DepositPage() {
               </p>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=168x168&data=${encodeURIComponent(depInfo.address)}`}
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=168x168&data=${encodeURIComponent(
+                  depInfo.address
+                )}`}
                 alt="QR"
                 className="mx-auto rounded-2xl bg-white p-2.5 shadow-lg"
               />
-              <div className="flex gap-2 items-center rounded-xl p-3 border" style={{ borderColor: 'var(--border)', background: 'var(--bg)' }}>
+              <div
+                className="flex gap-2 items-center rounded-xl p-3 border"
+                style={{ borderColor: 'var(--border)', background: 'var(--bg)' }}
+              >
                 <code className="text-xs break-all flex-1 font-mono">{depInfo.address}</code>
                 <button
                   type="button"
