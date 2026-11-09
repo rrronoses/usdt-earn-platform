@@ -62,17 +62,23 @@ export default function DashboardPage() {
         setClaimedOverride((prev) => ({ ...prev, [userPlanId]: at }));
         setData((prev: any) => {
           if (!prev) return prev;
+          const nextWithdrawal =
+            d.withdrawalBalance !== undefined && d.withdrawalBalance !== null
+              ? Number(d.withdrawalBalance)
+              : Number(prev.user?.withdrawalBalance || 0);
+          const nextToday =
+            d.todayEarnings !== undefined && d.todayEarnings !== null
+              ? Number(d.todayEarnings)
+              : Number(prev.user?.todayEarnings || 0);
+          const deposit = Number(prev.user?.depositBalance || 0);
           return {
             ...prev,
             user: prev.user
               ? {
                   ...prev.user,
-                  withdrawalBalance:
-                    d.withdrawalBalance ?? prev.user.withdrawalBalance,
-                  todayEarnings: d.todayEarnings ?? prev.user.todayEarnings,
-                  totalBalance:
-                    (prev.user.depositBalance || 0) +
-                    (d.withdrawalBalance ?? prev.user.withdrawalBalance || 0),
+                  withdrawalBalance: nextWithdrawal,
+                  todayEarnings: nextToday,
+                  totalBalance: deposit + nextWithdrawal,
                 }
               : prev.user,
             plans: (prev.plans || []).map((p: any) =>
