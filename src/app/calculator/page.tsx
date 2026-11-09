@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
+import { PublicHeader } from '@/components/PublicHeader';
+import { useThemeLang } from '@/components/ThemeLangProvider';
 
 interface CalcPlan {
   id: string;
@@ -20,6 +22,7 @@ const PLANS: CalcPlan[] = [
 ];
 
 export default function CalculatorPage() {
+  const { t } = useThemeLang();
   const [planId, setPlanId] = useState('gold');
   const [units, setUnits] = useState(1);
 
@@ -35,29 +38,22 @@ export default function CalculatorPage() {
   }, [plan, qty]);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      <header className="border-b border-white/5 sticky top-0 glass z-20">
-        <div className="max-w-3xl mx-auto px-4 h-14 flex items-center justify-between">
-          <Link href="/" className="font-bold">
-            USDT<span className="text-emerald-400">Earn</span>
-          </Link>
-          <Link href="/signup" className="text-sm text-emerald-400 font-semibold">
-            Get started →
-          </Link>
-        </div>
-      </header>
+    <div className="page-shell">
+      <PublicHeader rightLink={{ href: '/signup', label: t.getStartedArrow }} />
 
       <main className="max-w-3xl mx-auto px-4 py-10 space-y-6">
         <div>
-          <h1 className="text-3xl font-black tracking-tight">Earn calculator</h1>
-          <p className="text-slate-400 text-sm mt-2">
-            Estimate daily and cycle earnings before you buy a plan.
+          <h1 className="text-3xl font-black tracking-tight">{t.calcTitle}</h1>
+          <p className="text-sm mt-2" style={{ color: 'var(--muted)' }}>
+            {t.calcSub}
           </p>
         </div>
 
-        <div className="rounded-3xl border border-white/10 bg-slate-900/60 p-5 sm:p-6 space-y-5">
+        <div className="panel-card p-5 sm:p-6 space-y-5">
           <div>
-            <label className="text-xs uppercase tracking-wide text-slate-500 font-medium">Plan</label>
+            <label className="text-xs uppercase tracking-wide font-medium" style={{ color: 'var(--muted)' }}>
+              {t.planLabel}
+            </label>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
               {PLANS.map((p) => (
                 <button
@@ -67,11 +63,12 @@ export default function CalculatorPage() {
                   className={`rounded-xl border px-3 py-3 text-left transition ${
                     planId === p.id
                       ? 'border-emerald-500/50 bg-emerald-500/10'
-                      : 'border-white/10 hover:border-white/20'
+                      : ''
                   }`}
+                  style={planId === p.id ? undefined : { borderColor: 'var(--border)' }}
                 >
                   <p className="font-bold text-sm">{p.name}</p>
-                  <p className="text-xs text-slate-400 mt-0.5">
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>
                     {p.price} USDT · {p.daily}/day
                   </p>
                 </button>
@@ -80,8 +77,8 @@ export default function CalculatorPage() {
           </div>
 
           <div>
-            <label className="text-xs uppercase tracking-wide text-slate-500 font-medium">
-              Number of plans
+            <label className="text-xs uppercase tracking-wide font-medium" style={{ color: 'var(--muted)' }}>
+              {t.numberOfPlans}
             </label>
             <input
               type="number"
@@ -89,34 +86,37 @@ export default function CalculatorPage() {
               max={50}
               value={qty}
               onChange={(e) => setUnits(Number(e.target.value))}
-              className="mt-2 w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-700 focus:border-emerald-500 outline-none"
+              className="mt-2 input-field"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-              <p className="text-[11px] text-slate-500 uppercase">Investment</p>
-              <p className="text-2xl font-black text-white mt-1">{result.invest} USDT</p>
+            <div className="panel-card p-4">
+              <p className="text-[11px] uppercase" style={{ color: 'var(--muted)' }}>
+                {t.investment}
+              </p>
+              <p className="text-2xl font-black mt-1">{result.invest} USDT</p>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-              <p className="text-[11px] text-slate-500 uppercase">Daily claim</p>
-              <p className="text-2xl font-black text-emerald-400 mt-1">{result.daily} USDT</p>
+            <div className="panel-card p-4">
+              <p className="text-[11px] uppercase" style={{ color: 'var(--muted)' }}>
+                {t.dailyClaimLabel}
+              </p>
+              <p className="text-2xl font-black text-emerald-500 mt-1">{result.daily} USDT</p>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-              <p className="text-[11px] text-slate-500 uppercase">Cycle earn ({plan.days}d)</p>
-              <p className="text-2xl font-black text-teal-300 mt-1">{result.totalEarn} USDT</p>
+            <div className="panel-card p-4">
+              <p className="text-[11px] uppercase" style={{ color: 'var(--muted)' }}>
+                {t.cycleEarn} ({plan.days}d)
+              </p>
+              <p className="text-2xl font-black text-teal-500 mt-1">{result.totalEarn} USDT</p>
             </div>
             <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4">
-              <p className="text-[11px] text-emerald-300/80 uppercase">ROI on plan price</p>
-              <p className="text-2xl font-black text-emerald-300 mt-1">{result.roi}%</p>
+              <p className="text-[11px] text-emerald-600 uppercase">{t.roiLabel}</p>
+              <p className="text-2xl font-black text-emerald-500 mt-1">{result.roi}%</p>
             </div>
           </div>
 
-          <Link
-            href="/signup"
-            className="block w-full text-center py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-bold"
-          >
-            Start earning — free 3 USDT
+          <Link href="/signup" className="btn-primary block w-full text-center py-3.5">
+            {t.startEarning}
           </Link>
         </div>
       </main>

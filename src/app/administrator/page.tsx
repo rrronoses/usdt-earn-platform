@@ -3,9 +3,12 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useThemeLang } from '@/components/ThemeLangProvider';
+import { AuthTogglesBar } from '@/components/PublicHeader';
 
 export default function AdminLoginPage() {
   const router = useRouter();
+  const { t } = useThemeLang();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -35,7 +38,8 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden mesh-bg bg-slate-950">
+    <div className="page-shell flex items-center justify-center px-4 relative overflow-hidden mesh-bg">
+      <AuthTogglesBar />
       <div className="absolute -top-40 right-0 w-[420px] h-[420px] bg-violet-500/20 blur-[130px] rounded-full" />
       <div className="absolute -bottom-40 left-0 w-[360px] h-[360px] bg-emerald-500/15 blur-[110px] rounded-full" />
 
@@ -44,28 +48,32 @@ export default function AdminLoginPage() {
           <div className="inline-flex w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500 to-emerald-500 items-center justify-center text-2xl font-black text-white shadow-2xl shadow-violet-500/30 mb-4">
             A
           </div>
-          <h1 className="text-2xl font-black tracking-tight">Admin Console</h1>
-          <p className="text-slate-400 text-sm mt-1">
-            USDT<span className="text-emerald-400">Earn</span> control center
+          <h1 className="text-2xl font-black tracking-tight">{t.adminConsole}</h1>
+          <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>
+            {t.adminSub}
           </p>
         </div>
 
-        <form onSubmit={onSubmit} className="rounded-3xl border border-white/10 bg-slate-900/70 backdrop-blur-xl p-6 space-y-4 shadow-xl">
+        <form onSubmit={onSubmit} className="panel-card p-6 space-y-4 shadow-xl">
           {error && (
-            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{error}</div>
+            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-500 text-sm">{error}</div>
           )}
           <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wide">Username</label>
+            <label className="block text-xs font-medium mb-1.5 uppercase tracking-wide" style={{ color: 'var(--muted)' }}>
+              {t.username}
+            </label>
             <input
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               className="input-field"
-              placeholder="Username"
+              placeholder={t.username}
               autoComplete="username"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wide">Password</label>
+            <label className="block text-xs font-medium mb-1.5 uppercase tracking-wide" style={{ color: 'var(--muted)' }}>
+              {t.password}
+            </label>
             <input
               type="password"
               value={password}
@@ -76,13 +84,13 @@ export default function AdminLoginPage() {
             />
           </div>
           <button type="submit" disabled={loading} className="btn-primary w-full py-3.5">
-            {loading ? 'Signing in…' : 'Enter dashboard'}
+            {loading ? t.signingIn : t.enterDashboard}
           </button>
         </form>
 
         <p className="text-center mt-5">
-          <Link href="/" className="text-slate-500 text-sm hover:text-emerald-400 transition">
-            ← Back to site
+          <Link href="/" className="text-sm hover:text-emerald-500 transition" style={{ color: 'var(--muted)' }}>
+            {t.backToSite}
           </Link>
         </p>
       </div>

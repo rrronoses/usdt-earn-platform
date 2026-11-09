@@ -3,10 +3,13 @@
 import { useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useThemeLang } from '@/components/ThemeLangProvider';
+import { AuthTogglesBar } from '@/components/PublicHeader';
 
 function SignupForm() {
   const router = useRouter();
   const params = useSearchParams();
+  const { t } = useThemeLang();
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -43,41 +46,41 @@ function SignupForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-12 relative overflow-hidden mesh-bg">
-      <div className="absolute -top-32 -right-32 w-96 h-96 bg-emerald-500/25 blur-[120px] rounded-full animate-pulse-soft" />
+    <div className="page-shell flex items-center justify-center px-4 py-12 relative overflow-hidden mesh-bg">
+      <AuthTogglesBar />
+      <div className="absolute -top-32 -right-32 w-96 h-96 bg-emerald-500/25 blur-[120px] rounded-full" />
       <div className="absolute -bottom-40 -left-32 w-80 h-80 bg-teal-500/20 blur-[100px] rounded-full" />
 
       <div className="w-full max-w-md relative z-10">
         <div className="text-center mb-6">
           <Link href="/" className="inline-flex mb-4">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center font-bold text-white text-3xl shadow-2xl shadow-emerald-500/40 animate-float">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center font-bold text-white text-3xl shadow-2xl shadow-emerald-500/40">
               ₮
             </div>
           </Link>
-          <h1 className="text-2xl font-black tracking-tight">Create your account</h1>
-          <p className="text-slate-400 text-sm mt-1.5">
-            Get <span className="text-emerald-400 font-bold">3 USDT free</span> on{' '}
-            <span className="text-gradient font-semibold">USDT Earn</span>
+          <h1 className="text-2xl font-black tracking-tight">{t.createAccount}</h1>
+          <p className="text-sm mt-1.5" style={{ color: 'var(--muted)' }}>
+            {t.get3Free}
           </p>
         </div>
 
         <div className="mb-4 grid grid-cols-3 gap-2">
-          {['3 USDT bonus', 'Daily claims', '20% referral'].map((label) => (
+          {[t.bonus3, t.dailyClaims, t.ref20].map((label) => (
             <div
               key={label}
-              className="rounded-xl border border-emerald-500/25 bg-emerald-500/10 py-2.5 text-center text-[11px] font-semibold text-emerald-300"
+              className="rounded-xl border border-emerald-500/25 bg-emerald-500/10 py-2.5 text-center text-[11px] font-semibold text-emerald-600"
             >
               {label}
             </div>
           ))}
         </div>
 
-        <form onSubmit={onSubmit} className="card-premium p-6 space-y-3.5">
+        <form onSubmit={onSubmit} className="panel-card p-6 space-y-3.5">
           {error && (
-            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">{error}</div>
+            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-500 text-sm">{error}</div>
           )}
           <div>
-            <label className="block text-sm text-slate-300 mb-1.5 font-medium">Username</label>
+            <label className="block text-sm mb-1.5 font-medium">{t.username}</label>
             <input
               required
               minLength={3}
@@ -88,7 +91,7 @@ function SignupForm() {
             />
           </div>
           <div>
-            <label className="block text-sm text-slate-300 mb-1.5 font-medium">Email</label>
+            <label className="block text-sm mb-1.5 font-medium">{t.email}</label>
             <input
               type="email"
               required
@@ -99,7 +102,7 @@ function SignupForm() {
             />
           </div>
           <div>
-            <label className="block text-sm text-slate-300 mb-1.5 font-medium">Password (min 6)</label>
+            <label className="block text-sm mb-1.5 font-medium">{t.passwordMin6}</label>
             <input
               type="password"
               required
@@ -111,9 +114,7 @@ function SignupForm() {
             />
           </div>
           <div>
-            <label className="block text-sm text-slate-300 mb-1.5 font-medium">
-              Referral code <span className="text-slate-500 font-normal">(optional)</span>
-            </label>
+            <label className="block text-sm mb-1.5 font-medium">{t.referralOptional}</label>
             <input
               value={referralCode}
               onChange={(e) => setReferralCode(e.target.value)}
@@ -122,14 +123,14 @@ function SignupForm() {
             />
           </div>
           <button type="submit" disabled={loading} className="btn-primary w-full py-3.5 text-base mt-1">
-            {loading ? 'Creating…' : 'Sign Up & Get 3 USDT'}
+            {loading ? t.creating : t.signUpBtn}
           </button>
         </form>
 
-        <p className="text-center text-sm text-slate-400 mt-6">
-          Already have an account?{' '}
-          <Link href="/login" className="text-emerald-400 font-semibold hover:underline">
-            Login
+        <p className="text-center text-sm mt-6" style={{ color: 'var(--muted)' }}>
+          {t.alreadyAccount}{' '}
+          <Link href="/login" className="text-emerald-500 font-semibold hover:underline">
+            {t.login}
           </Link>
         </p>
       </div>
@@ -139,7 +140,7 @@ function SignupForm() {
 
 export default function SignupPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-slate-950 mesh-bg" />}>
+    <Suspense fallback={<div className="page-shell mesh-bg" />}>
       <SignupForm />
     </Suspense>
   );

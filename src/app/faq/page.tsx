@@ -1,6 +1,10 @@
-import Link from 'next/link';
+'use client';
 
-const FAQS = [
+import Link from 'next/link';
+import { PublicHeader } from '@/components/PublicHeader';
+import { useThemeLang } from '@/components/ThemeLangProvider';
+
+const FAQS_EN = [
   {
     q: 'How do I start?',
     a: 'Create a free account. You receive 3 USDT and a Bronze plan automatically. Claim daily earnings from the dashboard.',
@@ -31,29 +35,72 @@ const FAQS = [
   },
 ];
 
+const FAQS_FR = [
+  {
+    q: 'Comment commencer ?',
+    a: 'Créez un compte gratuit. Vous recevez 3 USDT et un plan Bronze automatiquement. Réclamez les gains depuis le tableau de bord.',
+  },
+  {
+    q: 'Quel réseau pour les dépôts ?',
+    a: 'Uniquement USDT sur TRON (TRC-20). Un envoi sur un autre réseau peut entraîner une perte définitive.',
+  },
+  {
+    q: 'Comment les dépôts sont-ils crédités ?',
+    a: 'Après génération d’une adresse et envoi du montant exact, le système vérifie la transaction on-chain et crédite automatiquement le solde de dépôt.',
+  },
+  {
+    q: 'Comment fonctionnent les claims ?',
+    a: 'Chaque plan actif peut être réclamé une fois toutes les 24 heures. Avec plusieurs plans, réclamez chacun séparément.',
+  },
+  {
+    q: 'Qu’est-ce que le programme de parrainage ?',
+    a: 'Partagez votre lien. Quand un filleul achète un plan payant, vous gagnez 20 % de commission sur le solde de retrait.',
+  },
+  {
+    q: 'Quel est le retrait minimum ?',
+    a: 'Le minimum est défini par l’administrateur (25 USDT par défaut). Les retraits sont traités en quelques heures.',
+  },
+  {
+    q: 'Puis-je racheter le même plan ?',
+    a: 'Bronze est accordé une fois à l’inscription. Les plans payants peuvent être rachetés après expiration.',
+  },
+];
+
 export default function FaqPage() {
+  const { t, lang } = useThemeLang();
+  const faqs = lang === 'fr' ? FAQS_FR : FAQS_EN;
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      <header className="border-b border-white/5 sticky top-0 glass z-20">
-        <div className="max-w-3xl mx-auto px-4 h-14 flex items-center justify-between">
-          <Link href="/" className="font-bold">USDT<span className="text-emerald-400">Earn</span></Link>
-          <Link href="/support" className="text-sm text-emerald-400 font-semibold">Support</Link>
-        </div>
-      </header>
+    <div className="page-shell">
+      <PublicHeader rightLink={{ href: '/support', label: t.support }} />
       <main className="max-w-3xl mx-auto px-4 py-10">
-        <h1 className="text-3xl font-black mb-2">FAQ</h1>
-        <p className="text-slate-400 text-sm mb-8">Answers to common questions about USDT Earn.</p>
+        <h1 className="text-3xl font-black mb-2">{t.faqTitle}</h1>
+        <p className="text-sm mb-8" style={{ color: 'var(--muted)' }}>
+          {t.faqSub}
+        </p>
         <div className="space-y-3">
-          {FAQS.map((item) => (
-            <details key={item.q} className="group rounded-2xl border border-white/10 bg-slate-900/50 open:border-emerald-500/30">
+          {faqs.map((item) => (
+            <details
+              key={item.q}
+              className="group panel-card open:border-emerald-500/30"
+            >
               <summary className="cursor-pointer list-none px-5 py-4 font-semibold flex items-center justify-between gap-3">
                 {item.q}
-                <span className="text-slate-500 group-open:rotate-45 transition text-lg">+</span>
+                <span className="group-open:rotate-45 transition text-lg" style={{ color: 'var(--muted)' }}>
+                  +
+                </span>
               </summary>
-              <p className="px-5 pb-4 text-sm text-slate-400 leading-relaxed">{item.a}</p>
+              <p className="px-5 pb-4 text-sm leading-relaxed" style={{ color: 'var(--muted)' }}>
+                {item.a}
+              </p>
             </details>
           ))}
         </div>
+        <p className="text-center mt-10">
+          <Link href="/" className="text-sm text-emerald-500 font-medium">
+            ← {t.home}
+          </Link>
+        </p>
       </main>
     </div>
   );
