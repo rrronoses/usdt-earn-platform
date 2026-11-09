@@ -31,6 +31,17 @@ export interface FetchTransfersOptions {
   maxRetries?: number;
 }
 
+/** TRON base58 address: T + 33 chars (no 0 O I l). Length 34. */
+export function isValidTronAddress(address: string | null | undefined): boolean {
+  if (!address) return false;
+  const a = address.trim();
+  return /^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(a);
+}
+
+export function normalizeTronAddress(address: string): string {
+  return String(address || '').trim();
+}
+
 function baseUrl(network: TronNetwork): string {
   return network === 'shasta'
     ? 'https://api.shasta.trongrid.io'
@@ -65,6 +76,11 @@ function sleep(ms: number) {
 export async function fetchUsdtTrc20Transfers(
   options: FetchTransfersOptions
 ): Promise<Trc20Transfer[]> {
+  const address = normalizeTronAddress(options.address);
+  if (!isValidTronAddress(address)) {
+    throw new Error('Invalid or missing TRON deposit address');
+  }
+
   const network = options.network ?? resolveNetwork();
   const apiKey = options.apiKey ?? getTronApiKey();
   const contract = usdtContract(network);
@@ -81,7 +97,7 @@ export async function fetchUsdtTrc20Transfers(
     params.set('min_timestamp', String(options.minTimestamp));
   }
 
-  const url = `${baseUrl(network)}/v1/accounts/${options.address}/transactions/trc20?${params}`;
+  const url = `${baseUrl(network)}/v1/accounts/${encodeURIComponent(address)}/transactions/trc20?${params}`;
 
   let attempt = 0;
   let lastError: Error | null = null;
@@ -101,10 +117,17 @@ export async function fetchUsdtTrc20Transfers(
         continue;
       }
 
+      // Unactivated / empty accounts can 404 — treat as no transfers yet
       if (res.status === 404) return [];
 
       if (!res.ok) {
         const text = await res.text().catch(() => '');
+        // TronGrid 400 for bad address
+        if (res.status === 400) {
+          throw new Error(
+            `TronGrid rejected address (check admin deposit pool is a real T… wallet). ${text.slice(0, 120)}`
+          );
+        }
         throw new Error(`TronGrid HTTP ${res.status}: ${text.slice(0, 200)}`);
       }
 
@@ -112,9 +135,10 @@ export async function fetchUsdtTrc20Transfers(
         success?: boolean;
         data?: Array<Record<string, unknown>>;
         Error?: string;
+        error?: string;
       };
 
-      if (json.Error) return [];
+      if (json.Error || json.error) return [];
 
       const rows = Array.isArray(json.data) ? json.data : [];
       const transfers: Trc20Transfer[] = [];
@@ -148,6 +172,10 @@ export async function fetchUsdtTrc20Transfers(
       return transfers;
     } catch (e) {
       lastError = e instanceof Error ? e : new Error(String(e));
+      // Don't retry permanent address errors
+      if (lastError.message.includes('Invalid or missing') || lastError.message.includes('rejected address')) {
+        throw lastError;
+      }
       const backoff = Math.min(30_000, 500 * 2 ** attempt);
       await sleep(backoff);
       attempt += 1;
@@ -166,12 +194,12 @@ export function matchDepositTransfers(
     amountTolerance?: number;
   }
 ): Trc20Transfer[] {
-  const addr = watch.address.trim();
+  const addr = normalizeTronAddress(watch.address);
   const tolerance = watch.amountTolerance ?? 0;
   const minAmount = Math.max(0, watch.expectedAmount - tolerance);
 
   return transfers.filter((t) => {
-    if (t.to !== addr) return false;
+    if (normalizeTronAddress(t.to) !== addr) return false;
     if (t.amount + 1e-12 < minAmount) return false;
     if (watch.createdAtMs && t.blockTimestamp && t.blockTimestamp < watch.createdAtMs) {
       return false;

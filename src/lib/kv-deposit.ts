@@ -1,27 +1,39 @@
 import type { DepositAddress, DepositWatch } from '@/types';
 import type { KVNamespace } from './kv-core';
 import { keys, getJSON, putJSON, generateId, getConfig } from './kv-core';
+import { isValidTronAddress, normalizeTronAddress } from './tron';
 
 export async function listDepositAddresses(kv: KVNamespace): Promise<DepositAddress[]> {
-  return (await getJSON<DepositAddress[]>(kv, keys.depositAddresses())) || [];
+  const list = (await getJSON<DepositAddress[]>(kv, keys.depositAddresses())) || [];
+  return list.map((a) => ({
+    ...a,
+    address: normalizeTronAddress(a.address),
+    network: 'TRC20' as const,
+  }));
 }
 
 export async function saveDepositAddresses(kv: KVNamespace, list: DepositAddress[]) {
   await putJSON(kv, keys.depositAddresses(), list);
 }
 
-/** Enabled addresses in the random assignment pool (active === true). */
+/** Enabled valid TRC-20 addresses in the random assignment pool. */
 export async function listEnabledDepositAddresses(kv: KVNamespace): Promise<DepositAddress[]> {
   const list = await listDepositAddresses(kv);
-  const enabled = list.filter((a) => a.active && a.address);
+  const enabled = list.filter((a) => a.active && isValidTronAddress(a.address));
   if (enabled.length) return enabled;
-  if (list.length) return list;
+
+  // Fallback: any valid address in list (even if marked inactive)
+  const anyValid = list.filter((a) => isValidTronAddress(a.address));
+  if (anyValid.length) return anyValid;
+
+  // Last resort: legacy system:config.depositAddress if it is a real TRON wallet
   const cfg = await getConfig(kv);
-  if (cfg.depositAddress) {
+  const legacy = normalizeTronAddress(cfg.depositAddress || '');
+  if (isValidTronAddress(legacy)) {
     const entry: DepositAddress = {
       id: generateId('addr'),
       network: 'TRC20',
-      address: cfg.depositAddress,
+      address: legacy,
       label: 'USDT TRC20',
       active: true,
       createdAt: new Date().toISOString(),
@@ -29,6 +41,7 @@ export async function listEnabledDepositAddresses(kv: KVNamespace): Promise<Depo
     await saveDepositAddresses(kv, [entry]);
     return [entry];
   }
+
   return [];
 }
 
@@ -37,7 +50,9 @@ export async function pickRandomDepositAddress(kv: KVNamespace): Promise<Deposit
   const pool = await listEnabledDepositAddresses(kv);
   if (!pool.length) return null;
   const idx = Math.floor(Math.random() * pool.length);
-  return pool[idx];
+  const picked = pool[idx];
+  if (!isValidTronAddress(picked.address)) return null;
+  return { ...picked, address: normalizeTronAddress(picked.address) };
 }
 
 /** @deprecated Prefer pickRandomDepositAddress */
@@ -73,14 +88,23 @@ export async function addDepositAddress(
   let active = true;
 
   if (typeof input === 'string') {
-    address = input.trim();
+    address = normalizeTronAddress(input);
     if (typeof labelOrSetActive === 'string') label = labelOrSetActive.trim() || label;
     if (typeof labelOrSetActive === 'boolean') active = labelOrSetActive;
     else active = setActiveArg;
   } else {
-    address = String(input.address || '').trim();
+    address = normalizeTronAddress(String(input.address || ''));
     label = input.label?.trim() || 'USDT TRC20';
     active = input.active !== false;
+  }
+
+  if (!isValidTronAddress(address)) {
+    throw new Error('Invalid TRON/TRC-20 address');
+  }
+
+  // Avoid duplicates
+  if (list.some((a) => normalizeTronAddress(a.address) === address)) {
+    return list;
   }
 
   const entry: DepositAddress = {
@@ -105,11 +129,16 @@ export async function updateDepositAddress(
   const idx = list.findIndex((a) => a.id === id);
   if (idx < 0) return null;
   const next = [...list];
+  const newAddr =
+    patch.address !== undefined ? normalizeTronAddress(String(patch.address)) : next[idx].address;
+  if (patch.address !== undefined && !isValidTronAddress(newAddr)) {
+    throw new Error('Invalid TRON/TRC-20 address');
+  }
   next[idx] = {
     ...next[idx],
     ...patch,
     network: 'TRC20',
-    address: patch.address?.trim() || next[idx].address,
+    address: newAddr,
   };
   await saveDepositAddresses(kv, next);
   return next[idx];
@@ -124,7 +153,7 @@ export async function removeDepositAddress(kv: KVNamespace, id: string): Promise
 }
 
 export async function getDepositWatchByAddress(kv: KVNamespace, address: string) {
-  return getJSON<DepositWatch>(kv, keys.depositWatch(address));
+  return getJSON<DepositWatch>(kv, keys.depositWatch(normalizeTronAddress(address)));
 }
 
 export async function getDepositWatchById(kv: KVNamespace, depositId: string) {
@@ -132,12 +161,14 @@ export async function getDepositWatchById(kv: KVNamespace, depositId: string) {
 }
 
 export async function saveDepositWatch(kv: KVNamespace, watch: DepositWatch) {
-  await putJSON(kv, keys.depositWatch(watch.address), watch);
-  await putJSON(kv, keys.depositWatchById(watch.depositId), watch);
+  const addr = normalizeTronAddress(watch.address);
+  const normalized = { ...watch, address: addr };
+  await putJSON(kv, keys.depositWatch(addr), normalized);
+  await putJSON(kv, keys.depositWatchById(watch.depositId), normalized);
 }
 
 export async function clearDepositWatch(kv: KVNamespace, watch: DepositWatch) {
-  await kv.delete(keys.depositWatch(watch.address));
+  await kv.delete(keys.depositWatch(normalizeTronAddress(watch.address)));
   await putJSON(kv, keys.depositWatchById(watch.depositId), watch);
 }
 

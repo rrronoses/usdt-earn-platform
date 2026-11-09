@@ -118,7 +118,8 @@ export const DEFAULT_CONFIG: SystemConfig = {
   minWithdrawalLimit: 25,
   minDepositLimit: 1,
   maxDepositLimit: 10000,
-  depositAddress: 'TU2zZPaxpe3WxNZ4jGfG1YruhCDLqtVTnt',
+  // Empty — admin must add real TRC-20 wallets under Admin → Deposits
+  depositAddress: '',
   depositNetwork: 'TRC20',
   depositExpiryMinutes: 30,
   withdrawalNote: 'Withdrawals are processed within 2-3 hours following administrative review.',
