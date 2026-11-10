@@ -13,11 +13,11 @@ import {
   saveAnalytics,
 } from '@/lib/kv';
 import { getUserToken, parseToken } from '@/lib/auth';
+import { planDailyEarn, analyticsEarnPaid } from '@/types';
 import type { Transaction } from '@/types';
 
 export const runtime = 'edge';
 
-/** Rolling 24-hour cooldown per plan after each successful claim. */
 const CLAIM_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
 function isPaidPlan(planId: string, planName: string): boolean {
@@ -31,8 +31,7 @@ function msUntilNextClaim(lastClaimedAt: string | null | undefined): number {
   if (!lastClaimedAt) return 0;
   const last = new Date(lastClaimedAt).getTime();
   if (Number.isNaN(last)) return 0;
-  const elapsed = Date.now() - last;
-  return Math.max(0, CLAIM_COOLDOWN_MS - elapsed);
+  return Math.max(0, CLAIM_COOLDOWN_MS - (Date.now() - last));
 }
 
 function formatRemaining(ms: number): string {
@@ -43,13 +42,6 @@ function formatRemaining(ms: number): string {
   return `${h}h ${m}m`;
 }
 
-/**
- * Claim daily earn for ONE purchased plan.
- * Body: { userPlanId: string }
- *
- * Cooldown: full 24 hours from lastClaimedAt (not calendar day).
- * Referral: 20% of this claim to referrer ONLY for paid plans (not free Bronze).
- */
 export async function POST(req: NextRequest) {
   const token = getUserToken();
   if (!token) return NextResponse.json({ ok: false, message: 'Unauthorized' }, { status: 401 });
@@ -115,13 +107,14 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const amount = Number(plan.dailyYield) || 0;
+  const amount = planDailyEarn(plan);
   if (amount <= 0) {
     return NextResponse.json({ ok: false, message: 'Invalid plan earn amount' }, { status: 400 });
   }
 
   const updatedPlan = {
     ...plan,
+    dailyEarn: amount,
     lastClaimedAt: now,
     claimedDays: (plan.claimedDays || 0) + 1,
   };
@@ -141,7 +134,7 @@ export async function POST(req: NextRequest) {
   await saveTx(kv, {
     id: generateId('tx'),
     userId: user.id,
-    type: 'yield',
+    type: 'earn',
     amount,
     status: 'completed',
     description: `Daily earn ${amount} USDT — ${plan.name}`,
@@ -173,7 +166,9 @@ export async function POST(req: NextRequest) {
   }
 
   const analytics = await getAnalytics(kv);
-  analytics.totalYieldPaid = Number((analytics.totalYieldPaid + amount).toFixed(6));
+  const paid = analyticsEarnPaid(analytics) + amount;
+  analytics.totalEarnPaid = Number(paid.toFixed(6));
+  analytics.totalYieldPaid = analytics.totalEarnPaid; // keep legacy field in sync
   await saveAnalytics(kv, analytics);
 
   const nextClaimAt = new Date(nowMs + CLAIM_COOLDOWN_MS).toISOString();

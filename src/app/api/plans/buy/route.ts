@@ -1,10 +1,18 @@
 import { NextResponse } from 'next/server';
 import { getStorage } from '@/lib/memory-kv';
 import {
-  ensureSeeded, getUser, saveUser, listPlans, getUserPlans, saveUserPlans,
-  saveTx, generateId, addDaysISO, getAnalytics, saveAnalytics,
+  ensureSeeded,
+  getUser,
+  saveUser,
+  getUserPlans,
+  saveUserPlans,
+  listPlans,
+  saveTx,
+  generateId,
+  addDaysISO,
 } from '@/lib/kv';
 import { getUserToken, parseToken } from '@/lib/auth';
+import { planDailyEarn } from '@/types';
 import type { UserPlan, Transaction } from '@/types';
 
 export const runtime = 'edge';
@@ -13,7 +21,9 @@ export async function POST(req: Request) {
   const token = getUserToken();
   if (!token) return NextResponse.json({ ok: false, message: 'Unauthorized' }, { status: 401 });
   const parsed = parseToken(token);
-  if (!parsed) return NextResponse.json({ ok: false, message: 'Unauthorized' }, { status: 401 });
+  if (!parsed || parsed.role !== 'user') {
+    return NextResponse.json({ ok: false, message: 'Unauthorized' }, { status: 401 });
+  }
 
   const body: any = await req.json().catch(() => ({}));
   const planId = String(body.planId || '');
@@ -22,39 +32,37 @@ export async function POST(req: Request) {
   const kv = getStorage();
   await ensureSeeded(kv);
   const user = await getUser(kv, parsed.userId);
-  if (!user || user.status === 'banned') {
-    return NextResponse.json({ ok: false, message: 'User unavailable' }, { status: 403 });
+  if (!user) return NextResponse.json({ ok: false, message: 'User not found' }, { status: 404 });
+  if (user.status === 'banned') {
+    return NextResponse.json({ ok: false, message: 'Account banned' }, { status: 403 });
   }
 
-  const plans = await listPlans(kv);
-  const plan = plans.find((p) => p.id === planId && p.active);
+  const catalog = await listPlans(kv);
+  const plan = catalog.find((p) => p.id === planId && p.active);
   if (!plan) return NextResponse.json({ ok: false, message: 'Plan not found' }, { status: 404 });
-  if (plan.isOneTime && plan.id === 'bronze') {
-    return NextResponse.json({ ok: false, message: 'Bronze is signup-only' }, { status: 400 });
+
+  const owned = await getUserPlans(kv, user.id);
+  if (plan.isOneTime && owned.some((p) => p.planId === plan.id && p.status === 'active')) {
+    return NextResponse.json({ ok: false, message: 'This one-time plan is already owned' }, { status: 400 });
   }
 
-  const existing = await getUserPlans(kv, user.id);
-  const activeSame = existing.find(
-    (up) => up.planId === plan.id && up.status === 'active' && new Date(up.expiryDate) > new Date()
-  );
-  if (activeSame) {
-    return NextResponse.json({ ok: false, message: 'Active plan exists; wait until expiry to rebuy' }, { status: 400 });
-  }
-
-  if (user.depositBalance < plan.price) {
+  const price = Number(plan.price) || 0;
+  if (user.depositBalance < price) {
     return NextResponse.json({ ok: false, message: 'Insufficient deposit balance' }, { status: 400 });
   }
 
   const now = new Date().toISOString();
-  user.depositBalance = Number((user.depositBalance - plan.price).toFixed(6));
+  const daily = planDailyEarn(plan);
+
+  user.depositBalance = Number((user.depositBalance - price).toFixed(6));
   await saveUser(kv, user);
 
-  const up: UserPlan = {
+  const userPlan: UserPlan = {
     userPlanId: generateId('up'),
     planId: plan.id,
     name: plan.name,
     price: plan.price,
-    dailyYield: plan.dailyYield,
+    dailyEarn: daily,
     durationDays: plan.durationDays,
     purchaseDate: now,
     expiryDate: addDaysISO(now, plan.durationDays),
@@ -62,24 +70,23 @@ export async function POST(req: Request) {
     claimedDays: 0,
     status: 'active',
   };
-  await saveUserPlans(kv, user.id, [...existing, up]);
+  owned.push(userPlan);
+  await saveUserPlans(kv, user.id, owned);
 
   await saveTx(kv, {
     id: generateId('tx'),
     userId: user.id,
     type: 'plan_purchase',
-    amount: plan.price,
+    amount: price,
     status: 'completed',
     description: `Purchased ${plan.name} plan`,
     timestamp: now,
   } as Transaction);
 
-  // Referral commission is paid on paid-plan daily claims only (see /api/claim).
-  // No commission on plan purchase or deposits.
-
-  const analytics = await getAnalytics(kv);
-  analytics.paidUsersCount += 1;
-  await saveAnalytics(kv, analytics);
-
-  return NextResponse.json({ ok: true, message: `Purchased ${plan.name}`, plan: up });
+  return NextResponse.json({
+    ok: true,
+    userPlan,
+    depositBalance: user.depositBalance,
+    message: `Purchased ${plan.name}`,
+  });
 }
