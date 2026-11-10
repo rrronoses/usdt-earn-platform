@@ -14,7 +14,8 @@ type Metrics = {
   pendingDeposits: number;
   totalDepositsVolume: number;
   totalWithdrawalsVolume: number;
-  totalYieldPaid: number;
+  totalEarnPaid?: number;
+  totalYieldPaid?: number;
   tvlDepositBalance: number;
   tvlWithdrawalBalance: number;
   platformTvl: number;
@@ -26,7 +27,8 @@ type Metrics = {
   trends?: {
     days: string[];
     deposits: number[];
-    yieldPaid: number[];
+    earnPaid?: number[];
+    yieldPaid?: number[];
   };
 };
 
@@ -101,6 +103,8 @@ export default function AdminDashboardPage() {
   }, []);
 
   const fmt = (n: number) => Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
+  const earnTotal = Number(m?.totalEarnPaid ?? m?.totalYieldPaid ?? 0);
+  const earnTrend = m?.trends?.earnPaid || m?.trends?.yieldPaid || [];
 
   return (
     <AdminShell
@@ -131,7 +135,7 @@ export default function AdminDashboardPage() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
             <AdminKpi label="Platform TVL" value={`${fmt(m.platformTvl)}`} hint="Deposit + withdraw balances" accent="emerald" />
             <AdminKpi label="Deposit volume" value={`${fmt(m.totalDepositsVolume)}`} hint="All-time credited deposits" accent="cyan" />
-            <AdminKpi label="Yield paid" value={`${fmt(m.totalYieldPaid)}`} hint="Daily claims settled" accent="violet" />
+            <AdminKpi label="Earn paid" value={`${fmt(earnTotal)}`} hint="Daily claims settled" accent="violet" />
             <AdminKpi label="Active users" value={m.activeUsers} hint={`${m.totalUsers} total · ${m.paidUsers} paid`} accent="sky" />
           </div>
 
@@ -163,7 +167,7 @@ export default function AdminDashboardPage() {
               <div className="flex items-center justify-between mb-3">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--muted)' }}>
-                    Yield · 7 days
+                    Earn · 7 days
                   </p>
                   <p className="text-lg font-bold mt-0.5">Payout trend</p>
                 </div>
@@ -171,7 +175,7 @@ export default function AdminDashboardPage() {
                   {m.storageBackend}
                 </span>
               </div>
-              <Sparkline data={m.trends?.yieldPaid || []} color="#10b981" height={56} />
+              <Sparkline data={earnTrend} color="#10b981" height={56} />
               <div className="flex justify-between text-[10px] mt-2" style={{ color: 'var(--muted)' }}>
                 <span>{m.trends?.days?.[0]?.slice(5) || '—'}</span>
                 <span>{m.trends?.days?.[m.trends.days.length - 1]?.slice(5) || '—'}</span>
