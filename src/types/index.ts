@@ -1,4 +1,14 @@
-export type TxType = 'deposit' | 'withdrawal' | 'yield' | 'referral' | 'plan_purchase' | 'signup_bonus' | 'admin_add' | 'admin_sub';
+/** Transaction types. `yield` kept only for reading legacy KV rows; new writes use `earn`. */
+export type TxType =
+  | 'deposit'
+  | 'withdrawal'
+  | 'earn'
+  | 'yield' // legacy
+  | 'referral'
+  | 'plan_purchase'
+  | 'signup_bonus'
+  | 'admin_add'
+  | 'admin_sub';
 export type TxStatus = 'pending' | 'completed' | 'rejected' | 'approved';
 export type UserStatus = 'active' | 'banned';
 
@@ -25,7 +35,10 @@ export interface Plan {
   name: string;
   price: number;
   durationDays: number;
-  dailyYield: number;
+  /** Daily earn amount (USDT). */
+  dailyEarn: number;
+  /** @deprecated legacy KV field — prefer dailyEarn */
+  dailyYield?: number;
   isOneTime: boolean;
   active: boolean;
   color: string;
@@ -37,7 +50,9 @@ export interface UserPlan {
   planId: string;
   name: string;
   price: number;
-  dailyYield: number;
+  dailyEarn: number;
+  /** @deprecated legacy KV field — prefer dailyEarn */
+  dailyYield?: number;
   durationDays: number;
   purchaseDate: string;
   expiryDate: string;
@@ -91,7 +106,6 @@ export interface SystemConfig {
   depositAddress: string;
   depositNetwork: string;
   depositExpiryMinutes: number;
-  /** How often the user deposit page auto-checks the chain (seconds). Default 60. */
   depositPollSeconds: number;
   withdrawalNote: string;
   supportTelegram: string;
@@ -103,17 +117,19 @@ export interface SystemConfig {
 export interface Analytics {
   totalDeposits: number;
   totalWithdrawals: number;
-  totalYieldPaid: number;
+  totalEarnPaid: number;
+  /** @deprecated legacy KV — prefer totalEarnPaid */
+  totalYieldPaid?: number;
   totalUsers: number;
   paidUsersCount: number;
 }
 
 export const DEFAULT_PLANS: Plan[] = [
-  { id: 'bronze', name: 'Bronze', price: 3, durationDays: 7, dailyYield: 1, isOneTime: true, active: true, color: 'from-amber-700 to-amber-500', badge: 'Starter' },
-  { id: 'silver', name: 'Silver', price: 10, durationDays: 28, dailyYield: 1, isOneTime: false, active: true, color: 'from-slate-400 to-slate-200', badge: 'Popular' },
-  { id: 'gold', name: 'Gold', price: 25, durationDays: 28, dailyYield: 2, isOneTime: false, active: true, color: 'from-yellow-500 to-amber-400' },
-  { id: 'gold-plus', name: 'Gold Plus', price: 40, durationDays: 28, dailyYield: 5, isOneTime: false, active: true, color: 'from-yellow-600 to-orange-400' },
-  { id: 'platinum', name: 'Platinum', price: 60, durationDays: 28, dailyYield: 7, isOneTime: false, active: true, color: 'from-cyan-400 to-blue-500', badge: 'Best Value' },
+  { id: 'bronze', name: 'Bronze', price: 3, durationDays: 7, dailyEarn: 1, isOneTime: true, active: true, color: 'from-amber-700 to-amber-500', badge: 'Starter' },
+  { id: 'silver', name: 'Silver', price: 10, durationDays: 28, dailyEarn: 1, isOneTime: false, active: true, color: 'from-slate-400 to-slate-200', badge: 'Popular' },
+  { id: 'gold', name: 'Gold', price: 25, durationDays: 28, dailyEarn: 2, isOneTime: false, active: true, color: 'from-yellow-500 to-amber-400' },
+  { id: 'gold-plus', name: 'Gold Plus', price: 40, durationDays: 28, dailyEarn: 5, isOneTime: false, active: true, color: 'from-yellow-600 to-orange-400' },
+  { id: 'platinum', name: 'Platinum', price: 60, durationDays: 28, dailyEarn: 7, isOneTime: false, active: true, color: 'from-cyan-400 to-blue-500', badge: 'Best Value' },
 ];
 
 export const DEFAULT_CONFIG: SystemConfig = {
@@ -134,7 +150,7 @@ export const DEFAULT_CONFIG: SystemConfig = {
 export const DEFAULT_ANALYTICS: Analytics = {
   totalDeposits: 0,
   totalWithdrawals: 0,
-  totalYieldPaid: 0,
+  totalEarnPaid: 0,
   totalUsers: 0,
   paidUsersCount: 0,
 };
@@ -157,4 +173,14 @@ export interface DepositWatch {
   status: 'pending' | 'completed' | 'expired' | 'cancelled';
   matchedTxId?: string;
   creditedAmount?: number;
+}
+
+/** Normalize plan fields loaded from KV (supports legacy dailyYield). */
+export function planDailyEarn(p: { dailyEarn?: number; dailyYield?: number }): number {
+  return Number(p.dailyEarn ?? p.dailyYield ?? 0) || 0;
+}
+
+/** Normalize analytics earn totals from KV. */
+export function analyticsEarnPaid(a: { totalEarnPaid?: number; totalYieldPaid?: number }): number {
+  return Number(a.totalEarnPaid ?? a.totalYieldPaid ?? 0) || 0;
 }
