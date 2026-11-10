@@ -17,6 +17,9 @@ import type { Transaction } from '@/types';
 
 export const runtime = 'edge';
 
+/** Rolling 24-hour cooldown per plan after each successful claim. */
+const CLAIM_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+
 function isPaidPlan(planId: string, planName: string): boolean {
   const id = (planId || '').toLowerCase();
   const name = (planName || '').toLowerCase();
@@ -24,10 +27,27 @@ function isPaidPlan(planId: string, planName: string): boolean {
   return true;
 }
 
+function msUntilNextClaim(lastClaimedAt: string | null | undefined): number {
+  if (!lastClaimedAt) return 0;
+  const last = new Date(lastClaimedAt).getTime();
+  if (Number.isNaN(last)) return 0;
+  const elapsed = Date.now() - last;
+  return Math.max(0, CLAIM_COOLDOWN_MS - elapsed);
+}
+
+function formatRemaining(ms: number): string {
+  const totalMin = Math.ceil(ms / 60_000);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  if (h <= 0) return `${m}m`;
+  return `${h}h ${m}m`;
+}
+
 /**
  * Claim daily earn for ONE purchased plan.
  * Body: { userPlanId: string }
  *
+ * Cooldown: full 24 hours from lastClaimedAt (not calendar day).
  * Referral: 20% of this claim to referrer ONLY for paid plans (not free Bronze).
  */
 export async function POST(req: NextRequest) {
@@ -51,6 +71,7 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ ok: false, message: 'User not found' }, { status: 404 });
 
   const now = new Date().toISOString();
+  const nowMs = Date.now();
   let plans = await getUserPlans(kv, user.id);
 
   plans = plans.map((p) => {
@@ -75,14 +96,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, message: 'This plan is expired' }, { status: 400 });
   }
 
-  if (isSameDay(plan.lastClaimedAt, now)) {
+  const remainingMs = msUntilNextClaim(plan.lastClaimedAt);
+  if (remainingMs > 0) {
+    const nextClaimAt = new Date(
+      new Date(plan.lastClaimedAt as string).getTime() + CLAIM_COOLDOWN_MS
+    ).toISOString();
     return NextResponse.json(
       {
         ok: false,
         alreadyClaimed: true,
         lastClaimedAt: plan.lastClaimedAt,
+        nextClaimAt,
+        remainingMs,
         userPlanId: plan.userPlanId,
-        message: `Already claimed ${plan.name} today. Come back tomorrow.`,
+        message: `Already claimed ${plan.name}. Next claim in ${formatRemaining(remainingMs)} (24h limit).`,
       },
       { status: 400 }
     );
@@ -149,15 +176,18 @@ export async function POST(req: NextRequest) {
   analytics.totalYieldPaid = Number((analytics.totalYieldPaid + amount).toFixed(6));
   await saveAnalytics(kv, analytics);
 
+  const nextClaimAt = new Date(nowMs + CLAIM_COOLDOWN_MS).toISOString();
+
   return NextResponse.json({
     ok: true,
     claimed: amount,
     planName: plan.name,
     userPlanId: plan.userPlanId,
     lastClaimedAt: now,
+    nextClaimAt,
     withdrawalBalance: user.withdrawalBalance,
     todayEarnings: user.todayEarnings,
     referralPaid,
-    message: `Claimed ${amount} USDT from ${plan.name}`,
+    message: `Claimed ${amount} USDT from ${plan.name}. Next claim after 24 hours.`,
   });
 }

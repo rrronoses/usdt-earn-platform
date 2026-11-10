@@ -6,15 +6,21 @@ import { useRouter } from 'next/navigation';
 import { UserNav } from '@/components/UserNav';
 import { useThemeLang } from '@/components/ThemeLangProvider';
 
-function sameUtcDay(a: string | null | undefined, b = new Date()) {
-  if (!a) return false;
-  const d = new Date(a);
-  if (Number.isNaN(d.getTime())) return false;
-  return (
-    d.getUTCFullYear() === b.getUTCFullYear() &&
-    d.getUTCMonth() === b.getUTCMonth() &&
-    d.getUTCDate() === b.getUTCDate()
-  );
+const CLAIM_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+
+function msUntilNextClaim(lastClaimedAt: string | null | undefined): number {
+  if (!lastClaimedAt) return 0;
+  const last = new Date(lastClaimedAt).getTime();
+  if (Number.isNaN(last)) return 0;
+  return Math.max(0, CLAIM_COOLDOWN_MS - (Date.now() - last));
+}
+
+function formatRemaining(ms: number): string {
+  const totalMin = Math.ceil(ms / 60_000);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  if (h <= 0) return `${m}m`;
+  return `${h}h ${m}m`;
 }
 
 export default function DashboardPage() {
@@ -25,6 +31,13 @@ export default function DashboardPage() {
   const [claimingId, setClaimingId] = useState<string | null>(null);
   /** Local override so button updates immediately after claim (KV lag safe) */
   const [claimedOverride, setClaimedOverride] = useState<Record<string, string>>({});
+  const [, setTick] = useState(0);
+
+  // Refresh remaining timers every 30s
+  useEffect(() => {
+    const id = setInterval(() => setTick((n) => n + 1), 30_000);
+    return () => clearInterval(id);
+  }, []);
 
   const loadMe = useCallback(() => {
     return fetch('/api/me')
@@ -56,7 +69,6 @@ export default function DashboardPage() {
 
       setMsg(d.message || (d.ok ? `Claimed ${d.claimed} USDT from ${planName}` : 'Claim failed'));
 
-      // Always lock the button for this plan if claimed now or already claimed today
       if (d.ok || d.alreadyClaimed) {
         const at = d.lastClaimedAt || new Date().toISOString();
         setClaimedOverride((prev) => ({ ...prev, [userPlanId]: at }));
@@ -86,7 +98,6 @@ export default function DashboardPage() {
             ),
           };
         });
-        // Refresh from server shortly after (eventual consistency)
         setTimeout(() => loadMe(), 800);
       }
     } catch {
@@ -108,13 +119,13 @@ export default function DashboardPage() {
     (p: any) => p.status === 'active' && new Date(p.expiryDate) > new Date()
   );
 
-  function planClaimedToday(p: any) {
-    const override = claimedOverride[p.userPlanId];
-    return sameUtcDay(override || p.lastClaimedAt);
+  function planCooldownMs(p: any) {
+    const last = claimedOverride[p.userPlanId] || p.lastClaimedAt;
+    return msUntilNextClaim(last);
   }
 
-  const claimableToday = activePlans.filter((p: any) => !planClaimedToday(p));
-  const dailyPotential = claimableToday.reduce(
+  const claimableNow = activePlans.filter((p: any) => planCooldownMs(p) <= 0);
+  const dailyPotential = claimableNow.reduce(
     (sum: number, p: any) => sum + (Number(p.dailyYield) || 0),
     0
   );
@@ -164,6 +175,9 @@ export default function DashboardPage() {
 
         <div>
           <h2 className="font-semibold mb-2">{t.activePlans}</h2>
+          <p className="text-xs mb-3" style={{ color: 'var(--muted)' }}>
+            Each plan: claim once every <strong>24 hours</strong> from last claim.
+          </p>
           {activePlans.length === 0 ? (
             <div className="panel-card p-4 text-center text-sm" style={{ color: 'var(--muted)' }}>
               No active plans.{' '}
@@ -174,7 +188,8 @@ export default function DashboardPage() {
           ) : (
             <div className="space-y-3">
               {activePlans.map((p: any) => {
-                const claimedToday = planClaimedToday(p);
+                const remaining = planCooldownMs(p);
+                const onCooldown = remaining > 0;
                 const isClaiming = claimingId === p.userPlanId;
                 return (
                   <div key={p.userPlanId} className="panel-card p-4 space-y-3">
@@ -185,6 +200,11 @@ export default function DashboardPage() {
                           Daily {p.dailyYield} USDT · expires{' '}
                           {new Date(p.expiryDate).toLocaleDateString()}
                         </p>
+                        {onCooldown && (
+                          <p className className="text-xs mt-1 text-amber-500 font-medium">
+                            Next claim in {formatRemaining(remaining)}
+                          </p>
+                        )}
                       </div>
                       <div className="text-right">
                         <p className="text-emerald-500 font-black text-xl">{p.dailyYield}</p>
@@ -195,15 +215,15 @@ export default function DashboardPage() {
                     </div>
                     <button
                       onClick={() => claimPlan(p.userPlanId, p.name)}
-                      disabled={claimedToday || isClaiming}
+                      disabled={onCooldown || isClaiming}
                       className={`w-full py-3 rounded-xl font-bold transition disabled:opacity-60 disabled:cursor-not-allowed ${
-                        claimedToday ? 'btn-ghost' : 'btn-primary'
+                        onCooldown ? 'btn-ghost' : 'btn-primary'
                       }`}
                     >
                       {isClaiming
                         ? 'Claiming…'
-                        : claimedToday
-                          ? `✓ ${p.name} claimed today`
+                        : onCooldown
+                          ? `Wait ${formatRemaining(remaining)}`
                           : `Claim ${p.dailyYield} USDT · ${p.name}`}
                     </button>
                   </div>
@@ -211,14 +231,14 @@ export default function DashboardPage() {
               })}
             </div>
           )}
-          {claimableToday.length > 0 && (
+          {claimableNow.length > 0 && (
             <p className="text-xs text-center mt-2" style={{ color: 'var(--muted)' }}>
-              {claimableToday.length} ready · up to {dailyPotential.toFixed(2)} USDT
+              {claimableNow.length} ready · up to {dailyPotential.toFixed(2)} USDT
             </p>
           )}
-          {claimableToday.length === 0 && activePlans.length > 0 && (
+          {claimableNow.length === 0 && activePlans.length > 0 && (
             <p className="text-xs text-center mt-2 text-emerald-600">
-              All active plans claimed for today
+              All plans on 24h cooldown
             </p>
           )}
         </div>
