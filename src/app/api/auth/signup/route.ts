@@ -14,7 +14,7 @@ import {
   getAnalytics,
   saveAnalytics,
 } from '@/lib/kv';
-import { hashPassword, setUserSession } from '@/lib/auth';
+import { hashPassword, createToken, userCookieOptions } from '@/lib/auth';
 import type { User, UserPlan, Transaction } from '@/types';
 
 export const runtime = 'edge';
@@ -59,7 +59,7 @@ export async function POST(req: Request) {
     id,
     username,
     email,
-    passwordHash: await hashPassword(password),
+    passwordHash: hashPassword(password),
     depositBalance: 0,
     withdrawalBalance: 0,
     todayEarnings: 0,
@@ -82,7 +82,7 @@ export async function POST(req: Request) {
     }
   }
 
-  // Free Bronze plan only (3 USDT value applied as plan, not cash balance)
+  // Free Bronze plan only (plan value, not cash balance)
   const bronze: UserPlan = {
     userPlanId: generateId('up'),
     planId: 'bronze',
@@ -112,11 +112,12 @@ export async function POST(req: Request) {
   analytics.totalUsers = (analytics.totalUsers || 0) + 1;
   await saveAnalytics(kv, analytics);
 
-  await setUserSession(id);
-
-  return NextResponse.json({
+  const token = createToken(id, 'user');
+  const res = NextResponse.json({
     ok: true,
     userId: id,
     message: 'Account created. Free Bronze plan assigned.',
   });
+  res.cookies.set(userCookieOptions(token));
+  return res;
 }
