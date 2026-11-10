@@ -29,11 +29,9 @@ export default function DashboardPage() {
   const [data, setData] = useState<any>(null);
   const [msg, setMsg] = useState('');
   const [claimingId, setClaimingId] = useState<string | null>(null);
-  /** Local override so button updates immediately after claim (KV lag safe) */
   const [claimedOverride, setClaimedOverride] = useState<Record<string, string>>({});
   const [, setTick] = useState(0);
 
-  // Refresh remaining timers every 30s
   useEffect(() => {
     const id = setInterval(() => setTick((n) => n + 1), 30_000);
     return () => clearInterval(id);
@@ -119,12 +117,12 @@ export default function DashboardPage() {
     (p: any) => p.status === 'active' && new Date(p.expiryDate) > new Date()
   );
 
-  function planCooldownMs(p: any) {
+  function planRemainingMs(p: any) {
     const last = claimedOverride[p.userPlanId] || p.lastClaimedAt;
     return msUntilNextClaim(last);
   }
 
-  const claimableNow = activePlans.filter((p: any) => planCooldownMs(p) <= 0);
+  const claimableNow = activePlans.filter((p: any) => planRemainingMs(p) <= 0);
   const dailyPotential = claimableNow.reduce(
     (sum: number, p: any) => sum + (Number(p.dailyYield) || 0),
     0
@@ -168,7 +166,7 @@ export default function DashboardPage() {
           <Link href="/deposit" className="btn-primary text-center py-3">
             {t.deposit}
           </Link>
-          <Link href="/withdraw" className="btn-ghost text-center py-3">
+          <Link href=""/withdraw" className="btn-ghost text-center py-3">
             {t.withdraw}
           </Link>
         </div>
@@ -188,7 +186,7 @@ export default function DashboardPage() {
           ) : (
             <div className="space-y-3">
               {activePlans.map((p: any) => {
-                const remaining = planCooldownMs(p);
+                const remaining = planRemainingMs(p);
                 const onCooldown = remaining > 0;
                 const isClaiming = claimingId === p.userPlanId;
                 return (
@@ -201,7 +199,7 @@ export default function DashboardPage() {
                           {new Date(p.expiryDate).toLocaleDateString()}
                         </p>
                         {onCooldown && (
-                          <p className className="text-xs mt-1 text-amber-500 font-medium">
+                          <p className="text-xs mt-1 text-amber-500 font-medium">
                             Next claim in {formatRemaining(remaining)}
                           </p>
                         )}
