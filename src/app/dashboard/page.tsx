@@ -8,6 +8,10 @@ import { useThemeLang } from '@/components/ThemeLangProvider';
 
 const CLAIM_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
+function dailyEarnOf(p: { dailyEarn?: number; dailyYield?: number }) {
+  return Number(p.dailyEarn ?? p.dailyYield ?? 0) || 0;
+}
+
 function msUntilNextClaim(lastClaimedAt: string | null | undefined): number {
   if (!lastClaimedAt) return 0;
   const last = new Date(lastClaimedAt).getTime();
@@ -124,7 +128,7 @@ export default function DashboardPage() {
 
   const claimableNow = activePlans.filter((p: any) => planRemainingMs(p) <= 0);
   const dailyPotential = claimableNow.reduce(
-    (sum: number, p: any) => sum + (Number(p.dailyYield) || 0),
+    (sum: number, p: any) => sum + dailyEarnOf(p),
     0
   );
 
@@ -189,13 +193,14 @@ export default function DashboardPage() {
                 const remaining = planRemainingMs(p);
                 const onCooldown = remaining > 0;
                 const isClaiming = claimingId === p.userPlanId;
+                const daily = dailyEarnOf(p);
                 return (
                   <div key={p.userPlanId} className="panel-card p-4 space-y-3">
                     <div className="flex justify-between gap-3">
                       <div>
                         <p className="font-bold text-lg">{p.name}</p>
                         <p className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>
-                          Daily {p.dailyYield} USDT · expires{' '}
+                          Daily {daily} USDT · expires{' '}
                           {new Date(p.expiryDate).toLocaleDateString()}
                         </p>
                         {onCooldown && (
@@ -205,7 +210,7 @@ export default function DashboardPage() {
                         )}
                       </div>
                       <div className="text-right">
-                        <p className="text-emerald-500 font-black text-xl">{p.dailyYield}</p>
+                        <p className="text-emerald-500 font-black text-xl">{daily}</p>
                         <p className="text-[10px] uppercase" style={{ color: 'var(--muted)' }}>
                           / day
                         </p>
@@ -222,7 +227,7 @@ export default function DashboardPage() {
                         ? 'Claiming…'
                         : onCooldown
                           ? `Wait ${formatRemaining(remaining)}`
-                          : `Claim ${p.dailyYield} USDT · ${p.name}`}
+                          : `Claim ${daily} USDT · ${p.name}`}
                     </button>
                   </div>
                 );
