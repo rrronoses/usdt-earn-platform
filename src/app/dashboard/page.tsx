@@ -166,7 +166,7 @@ export default function DashboardPage() {
           <Link href="/deposit" className="btn-primary text-center py-3">
             {t.deposit}
           </Link>
-          <Link href=""/withdraw" className="btn-ghost text-center py-3">
+          <Link href="/withdraw" className="btn-ghost text-center py-3">
             {t.withdraw}
           </Link>
         </div>
