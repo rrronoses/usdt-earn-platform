@@ -59,11 +59,7 @@ export function AdminKpi({
   );
 }
 
-export function StatusBadge({
-  status,
-}: {
-  status: string;
-}) {
+export function StatusBadge({ status }: { status: string }) {
   const s = status.toLowerCase();
   let cls = 'border-[var(--border)] text-[var(--muted)]';
   if (s === 'active' || s === 'completed' || s === 'approved' || s === 'confirmed') {
@@ -91,7 +87,11 @@ export function Sparkline({
   height?: number;
 }) {
   if (!data.length) {
-    return <div style={{ height }} className="opacity-40 text-xs flex items-center" style-color="var(--muted)">No data</div>;
+    return (
+      <div style={{ height, color: 'var(--muted)' }} className="opacity-40 text-xs flex items-center">
+        No data
+      </div>
+    );
   }
   const w = 160;
   const max = Math.max(...data, 0.0001);
@@ -106,9 +106,22 @@ export function Sparkline({
     .join(' ');
   const area = `0,${height} ${pts} ${w},${height}`;
   return (
-    <svg width="100%" height={height} viewBox={`0 0 ${w} ${height}`} preserveAspectRatio="none" className="overflow-visible">
+    <svg
+      width="100%"
+      height={height}
+      viewBox={`0 0 ${w} ${height}`}
+      preserveAspectRatio="none"
+      className="overflow-visible"
+    >
       <polygon points={area} fill={color} opacity={0.12} />
-      <polyline points={pts} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+      <polyline
+        points={pts}
+        fill="none"
+        stroke={color}
+        strokeWidth={2}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }
