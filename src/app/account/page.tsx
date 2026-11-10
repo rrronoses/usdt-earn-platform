@@ -10,6 +10,7 @@ export default function AccountPage() {
   const router = useRouter();
   const { t } = useThemeLang();
   const [user, setUser] = useState<any>(null);
+  const [config, setConfig] = useState<any>(null);
   const [msg, setMsg] = useState('');
 
   const load = useCallback(() => {
@@ -21,6 +22,7 @@ export default function AccountPage() {
           return;
         }
         setUser(d.user);
+        setConfig(d.config || null);
       });
   }, [router]);
 
@@ -44,6 +46,10 @@ export default function AccountPage() {
   const avatar = `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(
     user.avatarSeed || user.username
   )}`;
+
+  const telegram = String(config?.supportTelegram || '').trim();
+  const email = String(config?.supportEmail || '').trim();
+  const hasTelegram = telegram.startsWith('http') || telegram.startsWith('tg:') || telegram.startsWith('t.me');
 
   const links = [
     { href: '/deposit', title: t.deposit, desc: 'USDT TRC-20 · QR · auto credit', icon: '↓' },
@@ -108,6 +114,51 @@ export default function AccountPage() {
             <p className="font-bold text-emerald-500">{Number(user.withdrawalBalance).toFixed(2)}</p>
           </div>
         </div>
+
+        {/* Support / Telegram */}
+        {(hasTelegram || email) && (
+          <div className="panel-card p-4 space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)' }}>
+              Support
+            </p>
+            {hasTelegram && (
+              <a
+                href={telegram.startsWith('http') ? telegram : `https://${telegram.replace(/^\/+/, '')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 p-3 rounded-xl border border-sky-500/30 bg-sky-500/10 hover:bg-sky-500/15 transition"
+              >
+                <span className="w-10 h-10 rounded-xl bg-[#229ED9] text-white flex items-center justify-center text-lg font-bold">
+                  TG
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sky-600 dark:text-sky-300">Telegram support</p>
+                  <p className="text-xs truncate" style={{ color: 'var(--muted)' }}>
+                    {telegram}
+                  </p>
+                </div>
+                <span className="text-sky-500">→</span>
+              </a>
+            )}
+            {email && (
+              <a
+                href={`mailto:${email}`}
+                className="flex items-center gap-3 p-3 rounded-xl border hover:border-emerald-500/40 transition"
+                style={{ borderColor: 'var(--border)' }}
+              >
+                <span className="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-500 flex items-center justify-center text-lg">
+                  @
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold">Email support</p>
+                  <p className="text-xs truncate" style={{ color: 'var(--muted)' }}>
+                    {email}
+                  </p>
+                </div>
+              </a>
+            )}
+          </div>
+        )}
 
         <div className="space-y-2">
           {links.map((l) => (

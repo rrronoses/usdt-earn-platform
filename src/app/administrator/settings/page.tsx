@@ -9,6 +9,7 @@ export default function AdminSettingsPage() {
     minDepositLimit: 1,
     maxDepositLimit: 10000,
     depositExpiryMinutes: 30,
+    depositPollSeconds: 60,
     withdrawalNote: '',
     supportTelegram: '',
     supportEmail: '',
@@ -35,74 +36,107 @@ export default function AdminSettingsPage() {
     setSaving(false);
   }
 
-  const fields: { key: 'minWithdrawalLimit' | 'minDepositLimit' | 'maxDepositLimit' | 'depositExpiryMinutes'; label: string }[] = [
-    { key: 'minWithdrawalLimit', label: 'Min withdrawal (USDT)' },
-    { key: 'minDepositLimit', label: 'Min deposit (USDT)' },
-    { key: 'maxDepositLimit', label: 'Max deposit (USDT)' },
-    { key: 'depositExpiryMinutes', label: 'Deposit expiry (minutes)' },
-  ];
-
   return (
-    <AdminShell title="Settings" subtitle="Platform limits, support contacts, and notes">
+    <AdminShell
+      title="Settings"
+      subtitle="Limits, deposit chain polling, and support contacts"
+    >
       {msg && (
         <div className="mb-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-500 text-sm">
           {msg}
         </div>
       )}
 
-      <div className="max-w-lg space-y-4 panel-card p-5 sm:p-6">
-        {fields.map((f) => (
-          <label key={f.key} className="block">
-            <span className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--muted)' }}>
-              {f.label}
+      <div className="grid lg:grid-cols-2 gap-5 max-w-4xl">
+        <div className="panel-card p-5 sm:p-6 space-y-4">
+          <h2 className="font-bold text-sm uppercase tracking-wide" style={{ color: 'var(--muted)' }}>
+            Financial limits
+          </h2>
+          {(
+            [
+              { key: 'minWithdrawalLimit' as const, label: 'Min withdrawal (USDT)' },
+              { key: 'minDepositLimit' as const, label: 'Min deposit (USDT)' },
+              { key: 'maxDepositLimit' as const, label: 'Max deposit (USDT)' },
+              { key: 'depositExpiryMinutes' as const, label: 'Deposit request expiry (minutes)' },
+            ] as const
+          ).map((f) => (
+            <label key={f.key} className="block">
+              <span className="text-xs font-medium" style={{ color: 'var(--muted)' }}>
+                {f.label}
+              </span>
+              <input
+                type="number"
+                value={cfg[f.key] as number}
+                onChange={(e) => setCfg({ ...cfg, [f.key]: Number(e.target.value) })}
+                className="input-field mt-1.5"
+              />
+            </label>
+          ))}
+        </div>
+
+        <div className="panel-card p-5 sm:p-6 space-y-4">
+          <h2 className="font-bold text-sm uppercase tracking-wide" style={{ color: 'var(--muted)' }}>
+            Deposit chain check
+          </h2>
+          <label className="block">
+            <span className="text-xs font-medium" style={{ color: 'var(--muted)' }}>
+              Auto-check chain every (seconds)
             </span>
             <input
               type="number"
-              value={cfg[f.key] as number}
-              onChange={(e) => setCfg({ ...cfg, [f.key]: Number(e.target.value) })}
+              min={15}
+              max={600}
+              value={cfg.depositPollSeconds}
+              onChange={(e) => setCfg({ ...cfg, depositPollSeconds: Number(e.target.value) })}
+              className="input-field mt-1.5"
+            />
+            <p className="text-[11px] mt-1.5" style={{ color: 'var(--muted)' }}>
+              Default <strong>60</strong> (1 minute). Min 15 · Max 600. User deposit page polls TronGrid at this interval.
+            </p>
+          </label>
+
+          <h2 className="font-bold text-sm uppercase tracking-wide pt-2" style={{ color: 'var(--muted)' }}>
+            Support contacts
+          </h2>
+          <label className="block">
+            <span className="text-xs font-medium" style={{ color: 'var(--muted)' }}>
+              Support Telegram link
+            </span>
+            <input
+              type="url"
+              value={cfg.supportTelegram}
+              onChange={(e) => setCfg({ ...cfg, supportTelegram: e.target.value })}
+              placeholder="https://t.me/your_channel"
               className="input-field mt-1.5"
             />
           </label>
-        ))}
+          <label className="block">
+            <span className="text-xs font-medium" style={{ color: 'var(--muted)' }}>
+              Support email
+            </span>
+            <input
+              type="email"
+              value={cfg.supportEmail}
+              onChange={(e) => setCfg({ ...cfg, supportEmail: e.target.value })}
+              placeholder="support@example.com"
+              className="input-field mt-1.5"
+            />
+          </label>
+          <label className="block">
+            <span className="text-xs font-medium" style={{ color: 'var(--muted)' }}>
+              Withdrawal note
+            </span>
+            <textarea
+              value={cfg.withdrawalNote}
+              onChange={(e) => setCfg({ ...cfg, withdrawalNote: e.target.value })}
+              className="input-field mt-1.5 min-h-[100px] resize-y"
+            />
+          </label>
+        </div>
+      </div>
 
-        <label className="block">
-          <span className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--muted)' }}>
-            Support Telegram link
-          </span>
-          <input
-            type="url"
-            value={cfg.supportTelegram}
-            onChange={(e) => setCfg({ ...cfg, supportTelegram: e.target.value })}
-            placeholder="https://t.me/your_channel"
-            className="input-field mt-1.5"
-          />
-        </label>
-
-        <label className="block">
-          <span className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--muted)' }}>
-            Support email
-          </span>
-          <input
-            type="email"
-            value={cfg.supportEmail}
-            onChange={(e) => setCfg({ ...cfg, supportEmail: e.target.value })}
-            placeholder="support@example.com"
-            className="input-field mt-1.5"
-          />
-        </label>
-
-        <label className="block">
-          <span className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--muted)' }}>
-            Withdrawal note
-          </span>
-          <textarea
-            value={cfg.withdrawalNote}
-            onChange={(e) => setCfg({ ...cfg, withdrawalNote: e.target.value })}
-            className="input-field mt-1.5 min-h-[100px] resize-y"
-          />
-        </label>
-
-        <button onClick={save} disabled={saving} className="btn-primary w-full py-3.5">
+      <div className="max-w-4xl mt-5">
+        <button onClick={save} disabled={saving} className="btn-primary px-8 py-3.5">
           {saving ? 'Saving…' : 'Save settings'}
         </button>
       </div>

@@ -91,6 +91,8 @@ export interface SystemConfig {
   depositAddress: string;
   depositNetwork: string;
   depositExpiryMinutes: number;
+  /** How often the user deposit page auto-checks the chain (seconds). Default 60. */
+  depositPollSeconds: number;
   withdrawalNote: string;
   supportTelegram: string;
   supportEmail: string;
@@ -118,10 +120,10 @@ export const DEFAULT_CONFIG: SystemConfig = {
   minWithdrawalLimit: 25,
   minDepositLimit: 1,
   maxDepositLimit: 10000,
-  // Empty — admin must add real TRC-20 wallets under Admin → Deposits
   depositAddress: '',
   depositNetwork: 'TRC20',
   depositExpiryMinutes: 30,
+  depositPollSeconds: 60,
   withdrawalNote: 'Withdrawals are processed within 2-3 hours following administrative review.',
   supportTelegram: 'https://t.me/',
   supportEmail: 'support@usdtearn.pages.dev',

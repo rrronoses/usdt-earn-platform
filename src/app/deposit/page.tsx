@@ -49,13 +49,15 @@ export default function DepositPage() {
     timerRef.current = null;
   }
 
-  function startPolling(depositId: string) {
+  function startPolling(depositId: string, pollSeconds = 60) {
     stopPolling();
+    const intervalMs = Math.max(15, pollSeconds) * 1000;
     setSecondsLeft(240);
     timerRef.current = setInterval(() => {
       setSecondsLeft((s) => {
         if (s <= 1) {
-          stopPolling();
+          if (timerRef.current) clearInterval(timerRef.current);
+          timerRef.current = null;
           return 0;
         }
         return s - 1;
@@ -75,7 +77,7 @@ export default function DepositPage() {
       } catch {
         /* ignore */
       }
-    }, 10000);
+    }, intervalMs);
   }
 
   async function startDeposit() {
@@ -93,12 +95,13 @@ export default function DepositPage() {
         body: JSON.stringify({ amount }),
       }).then((r) => r.json());
 
+      const pollSec = Number(config?.depositPollSeconds) || 60;
+
       if (!d.ok) {
         setMsg(d.message || 'Failed');
-        // Still show address if API returned one (resume edge cases)
         if (d.depositId && d.address) {
           setDepInfo({ address: d.address, amount: d.amount || amount, depositId: d.depositId });
-          startPolling(d.depositId);
+          startPolling(d.depositId, pollSec);
         }
         return;
       }
@@ -114,7 +117,7 @@ export default function DepositPage() {
           ? 'Pending deposit resumed. Send the exact amount to the address below.'
           : 'Send exact USDT on TRC-20 only to the address below.'
       );
-      startPolling(d.depositId);
+      startPolling(d.depositId, pollSec);
     } catch {
       setMsg('Network error');
     } finally {
@@ -134,6 +137,7 @@ export default function DepositPage() {
   const ss = String(secondsLeft % 60).padStart(2, '0');
   const minD = config?.minDepositLimit ?? 1;
   const maxD = config?.maxDepositLimit;
+  const pollSec = Number(config?.depositPollSeconds) || 60;
 
   return (
     <div className="page-shell pb-28 relative">
@@ -144,7 +148,7 @@ export default function DepositPage() {
           <div>
             <h1 className="text-2xl font-black">{t.deposit}</h1>
             <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>
-              USDT TRC-20 only
+              USDT TRC-20 only · auto-check every {pollSec}s
             </p>
           </div>
           <Link href="/account" className="text-sm text-emerald-500 font-semibold">
@@ -183,7 +187,7 @@ export default function DepositPage() {
             </li>
             <li>After sending, wait for on-chain confirmation (usually 1–3 minutes).</li>
             <li>
-              Use the 4:00 timer window, or tap <strong>Check chain now</strong>.
+              Auto chain check every <strong>{pollSec} seconds</strong>, or tap <strong>Check chain now</strong>.
             </li>
             <li>Deposit balance is used to buy plans (not the same as withdrawal balance).</li>
           </ul>

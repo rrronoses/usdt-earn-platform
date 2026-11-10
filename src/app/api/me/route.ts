@@ -28,7 +28,6 @@ export async function GET() {
   const config = await getConfig(kv);
   const catalog = await listPlans(kv);
 
-  // Build per-referral breakdown: username + commission earned from that user
   const referralIds = Array.isArray(user.referrals) ? user.referrals : [];
   const commissionByRelated: Record<string, number> = {};
   for (const tx of transactions) {
@@ -82,7 +81,10 @@ export async function GET() {
       depositAddress: config.depositAddress,
       depositNetwork: config.depositNetwork,
       depositExpiryMinutes: config.depositExpiryMinutes,
+      depositPollSeconds: config.depositPollSeconds ?? 60,
       withdrawalNote: config.withdrawalNote,
+      supportTelegram: config.supportTelegram || '',
+      supportEmail: config.supportEmail || '',
     },
     catalog,
   });
