@@ -2,12 +2,24 @@
 
 import { useEffect, useState } from 'react';
 import { AdminShell } from '@/components/AdminNav';
+import { AdminTable, EmptyState, StatusBadge } from '@/components/admin/ui';
+
+type TxRow = {
+  id: string;
+  userId: string;
+  type: string;
+  amount: number;
+  status: string;
+  description: string;
+  timestamp: string;
+  txHash?: string;
+};
 
 export default function AdminTxPage() {
   const [type, setType] = useState('');
   const [status, setStatus] = useState('');
   const [userId, setUserId] = useState('');
-  const [txs, setTxs] = useState<any[]>([]);
+  const [txs, setTxs] = useState<TxRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   async function load() {
@@ -16,21 +28,34 @@ export default function AdminTxPage() {
     if (type) q.set('type', type);
     if (status) q.set('status', status);
     if (userId) q.set('userId', userId);
-    const d: any = await fetch(`/api/admin/transactions?${q}`).then((r) => r.json());
+    const d = (await fetch(`/api/admin/transactions?${q}`).then((r) => r.json())) as {
+      ok?: boolean;
+      transactions?: TxRow[];
+    };
     if (d.ok) setTxs(d.transactions || []);
     setLoading(false);
   }
+
   useEffect(() => {
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
-    <AdminShell title="Transactions" subtitle="Full ledger across all users">
-      <div className="flex flex-wrap gap-2 mb-4 p-3 rounded-2xl border border-white/10 bg-slate-900/50">
+    <AdminShell
+      title="Ledger"
+      subtitle="Full transaction history across all users"
+      actions={
+        <button type="button" onClick={load} className="btn-ghost text-xs px-3 py-1.5">
+          Refresh
+        </button>
+      }
+    >
+      <div className="flex flex-wrap gap-2 mb-4">
         <select
           value={type}
           onChange={(e) => setType(e.target.value)}
-          className="px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-sm"
+          className="input-field !w-auto text-sm py-2"
         >
           <option value="">All types</option>
           {['deposit', 'withdrawal', 'yield', 'referral', 'plan_purchase', 'signup_bonus', 'admin_add', 'admin_sub'].map(
@@ -44,7 +69,7 @@ export default function AdminTxPage() {
         <select
           value={status}
           onChange={(e) => setStatus(e.target.value)}
-          className="px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-sm"
+          className="input-field !w-auto text-sm py-2"
         >
           <option value="">All status</option>
           {['pending', 'completed', 'approved', 'rejected'].map((s) => (
@@ -57,39 +82,67 @@ export default function AdminTxPage() {
           value={userId}
           onChange={(e) => setUserId(e.target.value)}
           placeholder="User ID"
-          className="px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-sm font-mono"
+          className="input-field !w-36 text-sm py-2 font-mono"
         />
-        <button onClick={load} className="btn-primary px-4 py-2 text-sm">
-          Filter
+        <button type="button" onClick={load} className="btn-primary text-sm px-4 py-2">
+          Apply
         </button>
       </div>
 
-      <div className="rounded-2xl border border-white/10 bg-slate-900/40 divide-y divide-white/5 max-h-[70vh] overflow-y-auto">
-        {loading && <p className="p-8 text-center text-slate-500">Loading…</p>}
-        {!loading &&
-          txs.map((t) => (
-            <div key={t.id} className="px-4 py-3 text-sm flex justify-between gap-3 hover:bg-white/[0.03]">
-              <div className="min-w-0">
-                <p className="font-medium truncate">{t.description}</p>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  <span className="font-mono">{t.userId}</span> · {t.type} · {t.status} ·{' '}
-                  {new Date(t.timestamp).toLocaleString()}
-                </p>
-              </div>
-              <span
-                className={`font-mono font-semibold shrink-0 ${
-                  t.amount >= 0 ? 'text-emerald-400' : 'text-red-400'
-                }`}
-              >
-                {t.amount >= 0 ? '+' : ''}
-                {t.amount}
-              </span>
-            </div>
-          ))}
-        {!loading && txs.length === 0 && (
-          <p className="p-8 text-center text-slate-500 text-sm">No transactions match filters</p>
-        )}
-      </div>
+      <AdminTable>
+        <table className="w-full text-sm">
+          <thead style={{ background: 'color-mix(in srgb, var(--border) 40%, transparent)' }}>
+            <tr className="text-left text-xs uppercase tracking-wider" style={{ color: 'var(--muted)' }}>
+              <th className="p-3 font-medium">When</th>
+              <th className="p-3 font-medium">User</th>
+              <th className="p-3 font-medium">Type</th>
+              <th className="p-3 font-medium">Amount</th>
+              <th className="p-3 font-medium">Status</th>
+              <th className="p-3 font-medium">Detail</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading && (
+              <tr>
+                <td colSpan={6} className="p-8 text-center" style={{ color: 'var(--muted)' }}>
+                  Loading…
+                </td>
+              </tr>
+            )}
+            {!loading &&
+              txs.map((t) => (
+                <tr key={t.id} className="border-t" style={{ borderColor: 'var(--border)' }}>
+                  <td className="p-3 text-xs whitespace-nowrap" style={{ color: 'var(--muted)' }}>
+                    {new Date(t.timestamp).toLocaleString()}
+                  </td>
+                  <td className="p-3 font-mono text-xs">{t.userId}</td>
+                  <td className="p-3 text-xs font-semibold">{t.type}</td>
+                  <td
+                    className={`p-3 font-mono font-semibold ${
+                      t.amount >= 0 ? 'text-emerald-500' : 'text-red-500'
+                    }`}
+                  >
+                    {t.amount >= 0 ? '+' : ''}
+                    {Number(t.amount).toFixed(2)}
+                  </td>
+                  <td className="p-3">
+                    <StatusBadge status={t.status} />
+                  </td>
+                  <td className="p-3 text-xs max-w-[220px] truncate" title={t.description}>
+                    {t.description}
+                  </td>
+                </tr>
+              ))}
+            {!loading && txs.length === 0 && (
+              <tr>
+                <td colSpan={6} className="p-8">
+                  <EmptyState title="No transactions" hint="Try clearing filters." />
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </AdminTable>
     </AdminShell>
   );
 }

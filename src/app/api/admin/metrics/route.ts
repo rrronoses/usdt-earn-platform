@@ -7,13 +7,32 @@ import {
   getAnalytics,
   listDepositAddresses,
   listPlans,
+  getUserTransactions,
 } from '@/lib/kv';
 import { requireAdmin } from '@/lib/admin-guard';
 import { jsonOk, jsonError, withSecurityHeaders } from '@/lib/http';
 import { log } from '@/lib/logger';
 import { isUsingRealKV } from '@/lib/memory-kv';
+import type { Transaction } from '@/types';
 
 export const runtime = 'edge';
+
+function dayKey(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toISOString().slice(0, 10);
+}
+
+function lastNDays(n: number): string[] {
+  const out: string[] = [];
+  const now = new Date();
+  for (let i = n - 1; i >= 0; i -= 1) {
+    const d = new Date(now);
+    d.setUTCDate(d.getUTCDate() - i);
+    out.push(d.toISOString().slice(0, 10));
+  }
+  return out;
+}
 
 export async function GET() {
   const guard = requireAdmin();
@@ -31,6 +50,32 @@ export async function GET() {
       listDepositAddresses(kv),
       listPlans(kv),
     ]);
+
+    // Sample recent txs for trend charts (bounded)
+    const sampleUsers = users.slice(0, 80);
+    const txs: Transaction[] = [];
+    for (const u of sampleUsers) {
+      const ut = await getUserTransactions(kv, u.id, 40);
+      txs.push(...ut);
+    }
+
+    const days = lastNDays(7);
+    const depositByDay: Record<string, number> = {};
+    const yieldByDay: Record<string, number> = {};
+    for (const k of days) {
+      depositByDay[k] = 0;
+      yieldByDay[k] = 0;
+    }
+    for (const t of txs) {
+      const k = dayKey(t.timestamp);
+      if (!k || !(k in depositByDay)) continue;
+      if (t.type === 'deposit' && (t.status === 'completed' || t.status === 'approved')) {
+        depositByDay[k] += Number(t.amount) || 0;
+      }
+      if (t.type === 'yield' && t.status === 'completed') {
+        yieldByDay[k] += Number(t.amount) || 0;
+      }
+    }
 
     const activeUsers = users.filter((u) => u.status === 'active').length;
     const bannedUsers = users.filter((u) => u.status === 'banned').length;
@@ -59,7 +104,12 @@ export async function GET() {
           depositAddressesTotal: addresses.length,
           plansActive: plans.filter((p) => p.active).length,
           storageBackend: isUsingRealKV() ? 'cloudflare-kv' : 'memory-fallback',
-          workerHealth: 'ok',
+          workerHealth: 'ok' as const,
+          trends: {
+            days,
+            deposits: days.map((d) => Number((depositByDay[d] || 0).toFixed(4))),
+            yieldPaid: days.map((d) => Number((yieldByDay[d] || 0).toFixed(4))),
+          },
         },
       })
     );

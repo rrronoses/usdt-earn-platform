@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import type { ReactNode } from 'react';
 import { ThemeLangToggles, useThemeLang } from './ThemeLangProvider';
 
 const links = [
@@ -31,7 +32,7 @@ export function AdminNav() {
       <div className="max-w-7xl mx-auto px-3 sm:px-5">
         <div className="h-14 flex items-center justify-between gap-3">
           <Link href="/administrator/dashboard" className="flex items-center gap-2.5 shrink-0 group">
-            <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-600 via-emerald-500 to-teal-400 flex items-center justify-center text-white text-sm font-black shadow-lg shadow-violet-500/25 group-hover:scale-105 transition">
+            <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-600 via-emerald-500 to-teal-400 flex items-center justify-center text-white text-[11px] font-black shadow-lg shadow-violet-500/25 group-hover:scale-105 transition">
               UE
             </span>
             <div className="hidden sm:block leading-tight">
@@ -66,9 +67,9 @@ export function AdminNav() {
           </div>
         </div>
 
-        <nav className="flex gap-1 overflow-x-auto pb-2.5 -mx-1 px-1 scrollbar-none">
+        <nav className="flex gap-1 overflow-x-auto pb-2.5 -mx-1 px-1">
           {links.map((l) => {
-            const active = path === l.href || path.startsWith(l.href + '/');
+            const active = path === l.href || path.startsWith(`${l.href}/`);
             return (
               <Link
                 key={l.href}
@@ -76,7 +77,7 @@ export function AdminNav() {
                 className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition ${
                   active
                     ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 shadow-md shadow-emerald-500/25'
-                    : 'hover:bg-white/5'
+                    : 'hover:opacity-90'
                 }`}
                 style={active ? undefined : { color: 'var(--muted)' }}
               >
@@ -99,8 +100,8 @@ export function AdminShell({
 }: {
   title: string;
   subtitle?: string;
-  children: React.ReactNode;
-  actions?: React.ReactNode;
+  children: ReactNode;
+  actions?: ReactNode;
 }) {
   return (
     <div className="page-shell relative min-h-screen">
