@@ -16,29 +16,39 @@ type Tx = {
   address?: string;
 };
 
-function rankStatus(s: string) {
-  if (s === 'approved' || s === 'rejected' || s === 'completed') return 2;
-  if (s === 'pending') return 0;
-  return 1;
-}
-
-function uniqueWithdrawals(list: Tx[]): Tx[] {
-  const map = new Map<string, Tx>();
-  for (const tx of list) {
-    if (tx.type !== 'withdrawal') continue;
-    const key = `${Number(tx.amount).toFixed(6)}|${(tx.timestamp || '').slice(0, 10)}`;
-    const prev = map.get(key);
-    if (!prev || rankStatus(tx.status) > rankStatus(prev.status)) {
-      map.set(key, tx);
-    }
-  }
-  return Array.from(map.values()).sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1));
-}
-
 function shortAddr(addr?: string) {
   if (!addr) return '';
   if (addr.length <= 16) return addr;
   return `${addr.slice(0, 8)}…${addr.slice(-6)}`;
+}
+
+/** Keep all pending; drop only superseded pending when a later final exists for same request window. */
+function uniqueWithdrawals(list: Tx[]): Tx[] {
+  const withdrawals = list.filter((tx) => tx.type === 'withdrawal');
+  const finals = withdrawals.filter(
+    (t) => t.status === 'approved' || t.status === 'rejected' || t.status === 'completed'
+  );
+  const seen = new Set<string>();
+  const out: Tx[] = [];
+
+  for (const tx of withdrawals) {
+    if (seen.has(tx.id)) continue;
+    seen.add(tx.id);
+
+    if (tx.status === 'pending') {
+      const tTime = new Date(tx.timestamp).getTime();
+      const superseded = finals.some((f) => {
+        if (f.id === tx.id) return true;
+        if (Math.abs(Number(f.amount) - Number(tx.amount)) >= 0.000001) return false;
+        const fTime = new Date(f.timestamp).getTime();
+        return fTime >= tTime - 30_000 && fTime <= tTime + 2 * 60 * 60 * 1000;
+      });
+      if (superseded) continue;
+    }
+    out.push(tx);
+  }
+
+  return out.sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1));
 }
 
 export default function WithdrawPage() {
@@ -182,7 +192,7 @@ export default function WithdrawPage() {
           <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border)' }}>
             <h2 className="font-semibold">Withdrawal history</h2>
             <p className="text-[11px] mt-0.5" style={{ color: 'var(--muted)' }}>
-              Pending updates to Approved or Rejected after admin review
+              Pending → Approved or Rejected after admin review
             </p>
           </div>
           {withdrawals.length === 0 ? (
@@ -196,7 +206,11 @@ export default function WithdrawPage() {
                   <div className="min-w-0">
                     <p className="font-medium">{tx.amount} USDT</p>
                     {tx.address && (
-                      <p className="text-[11px] font-mono break-all mt-0.5" style={{ color: 'var(--muted)' }} title={tx.address}>
+                      <p
+                        className="text-[11px] font-mono break-all mt-0.5"
+                        style={{ color: 'var(--muted)' }}
+                        title={tx.address}
+                      >
                         TRC-20: {shortAddr(tx.address)}
                       </p>
                     )}
