@@ -17,7 +17,7 @@ export const runtime = 'edge';
 export async function GET() {
   const token = getUserToken();
   if (!token) return NextResponse.json({ ok: false }, { status: 401 });
-  const parsed = parseToken(token);
+  const parsed = await parseToken(token);
   if (!parsed || parsed.role !== 'user') return NextResponse.json({ ok: false }, { status: 401 });
 
   const kv = getStorage();

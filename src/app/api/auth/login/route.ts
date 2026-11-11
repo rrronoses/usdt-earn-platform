@@ -14,7 +14,6 @@ import { log } from '@/lib/logger';
 
 export const runtime = 'edge';
 
-/** Admin credentials: Cloudflare Pages env vars first, then system config, then defaults. */
 function resolveAdminCredentials(cfg: { adminUsername?: string; adminPasswordHash?: string }) {
   const envUser = (process.env.ADMIN_USERNAME || '').trim();
   const envPass = process.env.ADMIN_PASSWORD || '';
@@ -58,7 +57,6 @@ export async function POST(req: Request) {
         verifyPassword(password, creds.passwordPlain) ||
         hashPassword(password) === creds.passwordPlain;
 
-      // Built-in default when env is not set
       const defaultOk =
         !process.env.ADMIN_PASSWORD &&
         username.toLowerCase() === 'admin' &&
@@ -69,7 +67,7 @@ export async function POST(req: Request) {
         return withSecurityHeaders(jsonError('UNAUTHORIZED', 'Invalid admin credentials'));
       }
 
-      const token = createToken('admin', 'admin');
+      const token = await createToken('admin', 'admin');
       const res = jsonOk({ role: 'admin' as const });
       res.cookies.set(adminCookieOptions(token));
       log.info('auth.admin.ok', { username, fromEnv: creds.fromEnv });
@@ -107,7 +105,7 @@ export async function POST(req: Request) {
       /* index repair non-fatal */
     }
 
-    const token = createToken(user.id, 'user');
+    const token = await createToken(user.id, 'user');
     const res = jsonOk({
       user: { id: user.id, username: user.username, email: user.email },
     });
