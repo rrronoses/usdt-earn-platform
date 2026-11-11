@@ -8,7 +8,11 @@ import {
   getUser,
   saveUser,
   saveTx,
-  generateId,
+  getJSON,
+  putJSON,
+  keys,
+  getAnalytics,
+  saveAnalytics,
 } from '@/lib/kv';
 import { getAdminToken, parseToken } from '@/lib/auth';
 import type { Transaction } from '@/types';
@@ -20,6 +24,61 @@ function requireAdmin() {
   if (!tok) return null;
   const p = parseToken(tok);
   return p?.role === 'admin' ? p : null;
+}
+
+/** Update the original pending ledger row (same id as withdrawal) instead of creating a duplicate. */
+async function updateWithdrawalTx(
+  kv: Parameters<typeof getJSON>[0],
+  wId: string,
+  userId: string,
+  amount: number,
+  status: 'approved' | 'rejected',
+  description: string,
+  address?: string
+) {
+  const now = new Date().toISOString();
+  // Prefer tx keyed by withdrawal id (set on request)
+  let tx = await getJSON<Transaction>(kv, keys.tx(wId));
+
+  if (!tx) {
+    // Fallback: find any pending withdrawal tx for this user/amount
+    const idx = (await getJSON<string[]>(kv, keys.userTxIndex(userId))) || [];
+    for (const tid of idx.slice(0, 50)) {
+      const candidate = await getJSON<Transaction>(kv, keys.tx(tid));
+      if (
+        candidate &&
+        candidate.type === 'withdrawal' &&
+        candidate.status === 'pending' &&
+        Math.abs(Number(candidate.amount) - amount) < 0.000001
+      ) {
+        tx = candidate;
+        break;
+      }
+    }
+  }
+
+  if (tx) {
+    tx.status = status;
+    tx.description = description;
+    tx.timestamp = now;
+    if (address) tx.address = address;
+    await putJSON(kv, keys.tx(tx.id), tx);
+    return tx.id;
+  }
+
+  // Last resort: create one row only (should be rare)
+  const id = wId;
+  await saveTx(kv, {
+    id,
+    userId,
+    type: 'withdrawal',
+    amount,
+    status,
+    description,
+    timestamp: now,
+    address,
+  } as Transaction);
+  return id;
 }
 
 export async function GET() {
@@ -36,7 +95,7 @@ export async function POST(req: Request) {
   await ensureSeeded(kv);
   const body: any = await req.json().catch(() => ({}));
   const id = String(body.id || '');
-  const action = String(body.action || '');
+  const action = String(body.action || '').toLowerCase();
   const w = await getWithdrawal(kv, id);
   if (!w) return NextResponse.json({ ok: false, message: 'Not found' }, { status: 404 });
   if (w.status !== 'pending') {
@@ -44,20 +103,32 @@ export async function POST(req: Request) {
   }
 
   const now = new Date().toISOString();
+
   if (action === 'approve') {
     w.status = 'approved';
     w.processedAt = now;
     await saveWithdrawal(kv, w);
-    await saveTx(kv, {
-      id: generateId('tx'),
-      userId: w.userId,
-      type: 'withdrawal',
-      amount: w.amount,
-      status: 'approved',
-      description: `Withdrawal approved ${w.amount} USDT`,
-      timestamp: now,
-      address: w.destinationAddress,
-    } as Transaction);
+
+    await updateWithdrawalTx(
+      kv,
+      w.id,
+      w.userId,
+      w.amount,
+      'approved',
+      `Withdrawal approved ${w.amount} USDT`,
+      w.destinationAddress
+    );
+
+    try {
+      const analytics = await getAnalytics(kv);
+      analytics.totalWithdrawals = Number(
+        (Number(analytics.totalWithdrawals || 0) + Number(w.amount)).toFixed(6)
+      );
+      await saveAnalytics(kv, analytics);
+    } catch {
+      /* non-fatal */
+    }
+
     return NextResponse.json({ ok: true, message: 'Approved' });
   }
 
@@ -65,20 +136,23 @@ export async function POST(req: Request) {
     w.status = 'rejected';
     w.processedAt = now;
     await saveWithdrawal(kv, w);
+
     const user = await getUser(kv, w.userId);
     if (user) {
       user.withdrawalBalance = Number((user.withdrawalBalance + w.amount).toFixed(6));
       await saveUser(kv, user);
     }
-    await saveTx(kv, {
-      id: generateId('tx'),
-      userId: w.userId,
-      type: 'withdrawal',
-      amount: w.amount,
-      status: 'rejected',
-      description: `Withdrawal rejected — refunded ${w.amount} USDT`,
-      timestamp: now,
-    } as Transaction);
+
+    await updateWithdrawalTx(
+      kv,
+      w.id,
+      w.userId,
+      w.amount,
+      'rejected',
+      `Withdrawal rejected — refunded ${w.amount} USDT`,
+      w.destinationAddress
+    );
+
     return NextResponse.json({ ok: true, message: 'Rejected and refunded' });
   }
 
