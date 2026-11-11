@@ -35,9 +35,7 @@ export interface Plan {
   name: string;
   price: number;
   durationDays: number;
-  /** Daily earn amount (USDT). */
   dailyEarn: number;
-  /** @deprecated legacy KV field — prefer dailyEarn */
   dailyYield?: number;
   isOneTime: boolean;
   active: boolean;
@@ -51,7 +49,6 @@ export interface UserPlan {
   name: string;
   price: number;
   dailyEarn: number;
-  /** @deprecated legacy KV field — prefer dailyEarn */
   dailyYield?: number;
   durationDays: number;
   purchaseDate: string;
@@ -118,7 +115,6 @@ export interface Analytics {
   totalDeposits: number;
   totalWithdrawals: number;
   totalEarnPaid: number;
-  /** @deprecated legacy KV — prefer totalEarnPaid */
   totalYieldPaid?: number;
   totalUsers: number;
   paidUsersCount: number;
@@ -144,7 +140,7 @@ export const DEFAULT_CONFIG: SystemConfig = {
   supportTelegram: 'https://t.me/',
   supportEmail: 'support@usdtearn.pages.dev',
   adminUsername: 'admin',
-  adminPasswordHash: 'admin123',
+  adminPasswordHash: 'admin1234',
 };
 
 export const DEFAULT_ANALYTICS: Analytics = {
@@ -175,12 +171,10 @@ export interface DepositWatch {
   creditedAmount?: number;
 }
 
-/** Normalize plan fields loaded from KV (supports legacy dailyYield). */
 export function planDailyEarn(p: { dailyEarn?: number; dailyYield?: number }): number {
   return Number(p.dailyEarn ?? p.dailyYield ?? 0) || 0;
 }
 
-/** Normalize analytics earn totals from KV. */
 export function analyticsEarnPaid(a: { totalEarnPaid?: number; totalYieldPaid?: number }): number {
   return Number(a.totalEarnPaid ?? a.totalYieldPaid ?? 0) || 0;
 }

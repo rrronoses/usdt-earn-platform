@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { AdminShell } from '@/components/AdminNav';
 import { AdminTable, EmptyState, StatusBadge } from '@/components/admin/ui';
+import { txTypeLabel } from '@/lib/labels';
 
 type TxRow = {
   id: string;
@@ -52,25 +53,17 @@ export default function AdminTxPage() {
       }
     >
       <div className="flex flex-wrap gap-2 mb-4">
-        <select
-          value={type}
-          onChange={(e) => setType(e.target.value)}
-          className="input-field !w-auto text-sm py-2"
-        >
+        <select value={type} onChange={(e) => setType(e.target.value)} className="input-field !w-auto text-sm py-2">
           <option value="">All types</option>
-          {['deposit', 'withdrawal', 'yield', 'referral', 'plan_purchase', 'signup_bonus', 'admin_add', 'admin_sub'].map(
+          {['deposit', 'withdrawal', 'earn', 'referral', 'plan_purchase', 'signup_bonus', 'admin_add', 'admin_sub'].map(
             (t) => (
               <option key={t} value={t}>
-                {t}
+                {txTypeLabel(t)}
               </option>
             )
           )}
         </select>
-        <select
-          value={status}
-          onChange={(e) => setStatus(e.target.value)}
-          className="input-field !w-auto text-sm py-2"
-        >
+        <select value={status} onChange={(e) => setStatus(e.target.value)} className="input-field !w-auto text-sm py-2">
           <option value="">All status</option>
           {['pending', 'completed', 'approved', 'rejected'].map((s) => (
             <option key={s} value={s}>
@@ -116,7 +109,7 @@ export default function AdminTxPage() {
                     {new Date(t.timestamp).toLocaleString()}
                   </td>
                   <td className="p-3 font-mono text-xs">{t.userId}</td>
-                  <td className="p-3 text-xs font-semibold">{t.type}</td>
+                  <td className="p-3 text-xs font-semibold">{txTypeLabel(t.type)}</td>
                   <td
                     className={`p-3 font-mono font-semibold ${
                       t.amount >= 0 ? 'text-emerald-500' : 'text-red-500'

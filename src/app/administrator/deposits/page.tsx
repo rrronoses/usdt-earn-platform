@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { AdminShell } from '@/components/AdminNav';
+import { AdminPanel, EmptyState } from '@/components/admin/ui';
 
 type Addr = { id: string; network: string; address: string; label?: string; active: boolean };
 
@@ -47,7 +48,7 @@ export default function AdminDepositsPage() {
       subtitle={`${enabledCount} wallet(s) enabled for random TRC-20 assignment`}
     >
       {msg && (
-        <div className="mb-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-300 text-sm text-center">
+        <div className="mb-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-600 dark:text-emerald-300 text-sm text-center">
           {msg}
         </div>
       )}
@@ -56,11 +57,13 @@ export default function AdminDepositsPage() {
         {addresses.map((a) => (
           <div
             key={a.id}
-            className={`rounded-2xl border p-4 transition ${
-              a.active
-                ? 'border-emerald-500/40 bg-gradient-to-br from-emerald-500/10 to-slate-900'
-                : 'border-white/5 bg-slate-900/40 opacity-80'
-            }`}
+            className="rounded-2xl border p-4 transition"
+            style={{
+              borderColor: a.active
+                ? 'color-mix(in srgb, #10b981 40%, var(--border))'
+                : 'var(--border)',
+              opacity: a.active ? 1 : 0.8,
+            }}
           >
             {editId === a.id ? (
               <div className="space-y-2">
@@ -78,6 +81,7 @@ export default function AdminDepositsPage() {
                 />
                 <div className="flex gap-2">
                   <button
+                    type="button"
                     onClick={() =>
                       api({ action: 'update', id: a.id, address: editAddress, label: editLabel }).then(() =>
                         setEditId(null)
@@ -87,7 +91,7 @@ export default function AdminDepositsPage() {
                   >
                     Save
                   </button>
-                  <button onClick={() => setEditId(null)} className="btn-ghost px-4 py-2 text-sm">
+                  <button type="button" onClick={() => setEditId(null)} className="btn-ghost px-4 py-2 text-sm">
                     Cancel
                   </button>
                 </div>
@@ -96,47 +100,62 @@ export default function AdminDepositsPage() {
               <div className="flex flex-wrap justify-between gap-3">
                 <div className="min-w-0">
                   <p className="font-semibold flex items-center gap-2 flex-wrap">
-                    <span className="chip border-cyan-500/30 bg-cyan-500/10 text-cyan-300">TRC20</span>
+                    <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border border-cyan-500/30 bg-cyan-500/10 text-cyan-600 dark:text-cyan-300">
+                      TRC20
+                    </span>
                     {a.label || 'USDT TRC20'}
                     {a.active ? (
-                      <span className="chip border-emerald-500/30 bg-emerald-500/10 text-emerald-400">In pool</span>
+                      <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                        In pool
+                      </span>
                     ) : (
-                      <span className="chip border-slate-600 bg-slate-800 text-slate-400">Disabled</span>
+                      <span
+                        className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border"
+                        style={{ borderColor: 'var(--border)', color: 'var(--muted)' }}
+                      >
+                        Disabled
+                      </span>
                     )}
                   </p>
-                  <code className="text-xs text-slate-300 break-all block mt-2 font-mono">{a.address}</code>
+                  <code className="text-xs break-all block mt-2 font-mono" style={{ color: 'var(--muted)' }}>
+                    {a.address}
+                  </code>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {a.active ? (
                     <button
+                      type="button"
                       onClick={() => api({ action: 'update', id: a.id, active: false })}
-                      className="px-3 py-1.5 rounded-xl bg-amber-600/90 text-sm font-semibold"
+                      className="px-3 py-1.5 rounded-xl bg-amber-500 text-slate-950 text-sm font-semibold"
                     >
                       Disable
                     </button>
                   ) : (
                     <button
+                      type="button"
                       onClick={() => api({ action: 'update', id: a.id, active: true })}
-                      className="px-3 py-1.5 rounded-xl bg-emerald-600 text-sm font-semibold"
+                      className="px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-sm font-semibold"
                     >
                       Enable
                     </button>
                   )}
                   <button
+                    type="button"
                     onClick={() => {
                       setEditId(a.id);
                       setEditAddress(a.address);
                       setEditLabel(a.label || '');
                     }}
-                    className="px-3 py-1.5 rounded-xl bg-slate-700 text-sm font-semibold"
+                    className="btn-ghost px-3 py-1.5 text-sm"
                   >
                     Edit
                   </button>
                   <button
+                    type="button"
                     onClick={() => {
                       if (confirm('Remove this address?')) api({ action: 'remove', id: a.id });
                     }}
-                    className="px-3 py-1.5 rounded-xl bg-red-700/90 text-sm font-semibold"
+                    className="px-3 py-1.5 rounded-xl bg-red-600 text-white text-sm font-semibold"
                   >
                     Remove
                   </button>
@@ -146,13 +165,15 @@ export default function AdminDepositsPage() {
           </div>
         ))}
         {addresses.length === 0 && (
-          <p className="text-center text-slate-500 py-8">No addresses yet. Add a USDT TRC-20 wallet below.</p>
+          <EmptyState title="No addresses yet" hint="Add a USDT TRC-20 wallet below." />
         )}
       </div>
 
-      <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-5 space-y-3 max-w-xl">
+      <AdminPanel className="p-5 space-y-3 max-w-xl">
         <h2 className="font-bold">Add USDT TRC-20 address</h2>
-        <p className="text-xs text-slate-500">TRON address starting with T. Joins the random pool when active.</p>
+        <p className="text-xs" style={{ color: 'var(--muted)' }}>
+          TRON address starting with T. Joins the random pool when active.
+        </p>
         <input
           value={label}
           onChange={(e) => setLabel(e.target.value)}
@@ -166,6 +187,7 @@ export default function AdminDepositsPage() {
           className="input-field font-mono"
         />
         <button
+          type="button"
           onClick={() => {
             if (!address.trim()) {
               setMsg('Address required');
@@ -177,7 +199,7 @@ export default function AdminDepositsPage() {
         >
           Add to random pool
         </button>
-      </div>
+      </AdminPanel>
     </AdminShell>
   );
 }

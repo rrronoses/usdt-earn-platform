@@ -32,11 +32,12 @@ export async function POST(req: Request) {
   const body: any = await req.json().catch(() => ({}));
   const action = String(body.action || 'save');
 
-  if (action === 'delete') {
-    const id = String(body.id || '');
+  if (action === 'delete' || action === 'remove') {
+    const id = String(body.id || body.plan?.id || '');
     if (!id) return NextResponse.json({ ok: false, message: 'id required' }, { status: 400 });
     await deletePlan(kv, id);
-    return NextResponse.json({ ok: true, plans: await listPlans(kv) });
+    const plans = (await listPlans(kv)).map((p) => ({ ...p, dailyEarn: planDailyEarn(p) }));
+    return NextResponse.json({ ok: true, plans, message: 'Plan removed' });
   }
 
   const p = body.plan || body;
@@ -54,5 +55,10 @@ export async function POST(req: Request) {
     badge: p.badge ? String(p.badge) : undefined,
   };
   await savePlan(kv, plan);
-  return NextResponse.json({ ok: true, plans: await listPlans(kv) });
+  const plans = (await listPlans(kv)).map((x) => ({ ...x, dailyEarn: planDailyEarn(x) }));
+  return NextResponse.json({
+    ok: true,
+    plans,
+    message: action === 'update' ? 'Plan updated' : 'Plan saved',
+  });
 }

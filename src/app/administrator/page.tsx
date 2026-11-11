@@ -40,17 +40,17 @@ export default function AdminLoginPage() {
   return (
     <div className="page-shell flex items-center justify-center px-4 relative overflow-hidden mesh-bg">
       <AuthTogglesBar />
-      <div className="absolute -top-40 right-0 w-[420px] h-[420px] bg-violet-500/20 blur-[130px] rounded-full" />
-      <div className="absolute -bottom-40 left-0 w-[360px] h-[360px] bg-emerald-500/15 blur-[110px] rounded-full" />
+      <div className="absolute -top-40 right-0 w-[420px] h-[420px] bg-violet-500/20 blur-[130px] rounded-full pointer-events-none" />
+      <div className="absolute -bottom-40 left-0 w-[360px] h-[360px] bg-emerald-500/15 blur-[110px] rounded-full pointer-events-none" />
 
       <div className="w-full max-w-md relative z-10">
         <div className="text-center mb-8">
-          <div className="inline-flex w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500 to-emerald-500 items-center justify-center text-2xl font-black text-white shadow-2xl shadow-violet-500/30 mb-4">
-            A
+          <div className="inline-flex w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-600 via-emerald-500 to-teal-400 items-center justify-center text-lg font-black text-white shadow-2xl shadow-violet-500/30 mb-4">
+            UE
           </div>
-          <h1 className="text-2xl font-black tracking-tight">{t.adminConsole}</h1>
+          <h1 className="text-2xl font-black tracking-tight">SaaS Admin</h1>
           <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>
-            {t.adminSub}
+            USDT Earn · Control center
           </p>
         </div>
 
@@ -66,7 +66,7 @@ export default function AdminLoginPage() {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               className="input-field"
-              placeholder={t.username}
+              placeholder="admin"
               autoComplete="username"
             />
           </div>

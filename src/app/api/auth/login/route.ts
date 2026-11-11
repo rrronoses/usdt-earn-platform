@@ -14,14 +14,13 @@ import { log } from '@/lib/logger';
 
 export const runtime = 'edge';
 
-/** Admin credentials: Cloudflare Pages env vars first, then system config, then safe defaults. */
+/** Admin credentials: Cloudflare Pages env vars first, then system config, then defaults. */
 function resolveAdminCredentials(cfg: { adminUsername?: string; adminPasswordHash?: string }) {
   const envUser = (process.env.ADMIN_USERNAME || '').trim();
   const envPass = process.env.ADMIN_PASSWORD || '';
 
   const username = envUser || cfg.adminUsername || 'admin';
-  // Prefer env password; else KV config (plain or hashed); else empty (must set env in production)
-  const passwordPlain = envPass || (cfg.adminPasswordHash || '');
+  const passwordPlain = envPass || (cfg.adminPasswordHash || 'admin1234');
 
   return { username, passwordPlain, fromEnv: Boolean(envUser || envPass) };
 }
@@ -59,13 +58,13 @@ export async function POST(req: Request) {
         verifyPassword(password, creds.passwordPlain) ||
         hashPassword(password) === creds.passwordPlain;
 
-      // Legacy demo only if ADMIN_PASSWORD is not set in env
-      const demoOk =
+      // Built-in default when env is not set
+      const defaultOk =
         !process.env.ADMIN_PASSWORD &&
-        username === 'admin' &&
-        password === 'admin123';
+        username.toLowerCase() === 'admin' &&
+        (password === 'admin1234' || password === 'admin123');
 
-      if (!(userMatch && passMatch) && !demoOk) {
+      if (!(userMatch && passMatch) && !defaultOk) {
         log.warn('auth.admin.fail', { username });
         return withSecurityHeaders(jsonError('UNAUTHORIZED', 'Invalid admin credentials'));
       }
