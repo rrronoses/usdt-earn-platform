@@ -10,11 +10,17 @@ type Plan = {
   name: string;
   price: number;
   durationDays: number;
-  dailyYield: number;
+  dailyEarn?: number;
+  dailyYield?: number;
   isOneTime: boolean;
   active: boolean;
   badge?: string;
 };
+
+function dailyOf(p: { dailyEarn?: number; dailyYield?: number }) {
+  const n = Number(p.dailyEarn ?? p.dailyYield ?? 0);
+  return Number.isFinite(n) ? n : 0;
+}
 
 export default function PlansPage() {
   const router = useRouter();
@@ -33,8 +39,8 @@ export default function PlansPage() {
           router.push('/login');
           return;
         }
-        setDepositBalance(d.user.depositBalance);
-        setPlans((d.catalog || []).filter((p: Plan) => p.active));
+        setDepositBalance(Number(d.user.depositBalance) || 0);
+        setPlans((d.catalog || []).filter((p: Plan) => p.active !== false));
         setOwned(
           (d.plans || []).filter(
             (p: any) => p.status === 'active' && new Date(p.expiryDate) > new Date()
@@ -65,7 +71,7 @@ export default function PlansPage() {
     setLoading(null);
   }
 
-  const dailyFromOwned = owned.reduce((s, p) => s + (Number(p.dailyYield) || 0), 0);
+  const dailyFromOwned = owned.reduce((s, p) => s + dailyOf(p), 0);
 
   return (
     <div className="page-shell pb-28 relative">
@@ -103,11 +109,13 @@ export default function PlansPage() {
         )}
 
         {plans.map((p) => {
-          const total = p.dailyYield * p.durationDays;
+          const daily = dailyOf(p);
+          const days = Number(p.durationDays) || 0;
+          const total = Number((daily * days).toFixed(2));
           const isBronze = p.isOneTime || p.id === 'bronze';
           const hasActive = owned.some((o) => o.planId === p.id);
-          const featured = p.price === 25 || p.price === 60 || (p.badge && p.badge.length > 0);
-          const canAfford = depositBalance >= p.price;
+          const featured = p.price === 25 || p.price === 60 || Boolean(p.badge);
+          const canAfford = depositBalance >= Number(p.price);
 
           return (
             <div
@@ -145,11 +153,15 @@ export default function PlansPage() {
 
               <div className="mt-4 grid grid-cols-3 gap-2 text-center">
                 {[
-                  { label: 'Days', value: p.durationDays },
-                  { label: 'Daily claim', value: p.dailyYield, accent: true },
-                  { label: 'Max earn', value: total },
+                  { label: 'Days', value: String(days) },
+                  { label: 'Daily claim', value: String(daily), accent: true },
+                  { label: 'Max earn', value: String(total) },
                 ].map((c) => (
-                  <div key={c.label} className="rounded-xl py-2.5 border" style={{ borderColor: 'var(--border)', background: 'var(--bg)' }}>
+                  <div
+                    key={c.label}
+                    className="rounded-xl py-2.5 border"
+                    style={{ borderColor: 'var(--border)', background: 'var(--bg)' }}
+                  >
                     <p className="text-[10px] uppercase" style={{ color: 'var(--muted)' }}>
                       {c.label}
                     </p>
@@ -159,11 +171,10 @@ export default function PlansPage() {
               </div>
 
               <button
+                type="button"
                 onClick={() => buy(p.id)}
                 disabled={isBronze || hasActive || loading === p.id || (!canAfford && !isBronze)}
-                className={`mt-4 w-full py-3.5 rounded-xl font-extrabold transition disabled:opacity-40 active:scale-[0.98] ${
-                  featured && !isBronze && !hasActive ? 'btn-primary' : 'btn-primary'
-                }`}
+                className="mt-4 w-full py-3.5 rounded-xl font-extrabold transition disabled:opacity-40 active:scale-[0.98] btn-primary"
               >
                 {isBronze
                   ? 'Included on signup'

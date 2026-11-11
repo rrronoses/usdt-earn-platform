@@ -9,6 +9,7 @@ import {
   listPlans,
 } from '@/lib/kv';
 import { getUserToken, parseToken } from '@/lib/auth';
+import { planDailyEarn } from '@/types';
 
 export const runtime = 'edge';
 
@@ -23,10 +24,20 @@ export async function GET() {
   const user = await getUser(kv, parsed.userId);
   if (!user) return NextResponse.json({ ok: false }, { status: 401 });
 
-  const plans = await getUserPlans(kv, user.id);
+  const plansRaw = await getUserPlans(kv, user.id);
+  const plans = plansRaw.map((p) => ({
+    ...p,
+    dailyEarn: planDailyEarn(p),
+  }));
   const transactions = await getUserTransactions(kv, user.id, 100);
   const config = await getConfig(kv);
-  const catalog = await listPlans(kv);
+  const catalogRaw = await listPlans(kv);
+  const catalog = catalogRaw.map((p) => ({
+    ...p,
+    dailyEarn: planDailyEarn(p),
+    // keep legacy key for any old client code
+    dailyYield: planDailyEarn(p),
+  }));
 
   const referralIds = Array.isArray(user.referrals) ? user.referrals : [];
   const commissionByRelated: Record<string, number> = {};
