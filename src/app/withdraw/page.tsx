@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { UserNav } from '@/components/UserNav';
@@ -14,6 +14,28 @@ type Tx = {
   description: string;
   timestamp: string;
 };
+
+function rankStatus(s: string) {
+  if (s === 'approved' || s === 'rejected' || s === 'completed') return 2;
+  if (s === 'pending') return 0;
+  return 1;
+}
+
+/** One row per withdrawal amount/day (hide stale pending when approved exists). */
+function uniqueWithdrawals(list: Tx[]): Tx[] {
+  const map = new Map<string, Tx>();
+  for (const tx of list) {
+    if (tx.type !== 'withdrawal') continue;
+    const key = `${Number(tx.amount).toFixed(6)}|${(tx.timestamp || '').slice(0, 10)}`;
+    const prev = map.get(key);
+    if (!prev || rankStatus(tx.status) > rankStatus(prev.status)) {
+      map.set(key, tx);
+    }
+  }
+  return Array.from(map.values()).sort((a, b) =>
+    a.timestamp < b.timestamp ? 1 : -1
+  );
+}
 
 export default function WithdrawPage() {
   const router = useRouter();
@@ -71,6 +93,8 @@ export default function WithdrawPage() {
     setBusy(false);
   }
 
+  const withdrawals = useMemo(() => uniqueWithdrawals(transactions), [transactions]);
+
   if (!user) {
     return (
       <div className="page-shell flex items-center justify-center">
@@ -78,8 +102,6 @@ export default function WithdrawPage() {
       </div>
     );
   }
-
-  const withdrawals = transactions.filter((tx) => tx.type === 'withdrawal');
 
   return (
     <div className="page-shell pb-28 relative">
@@ -143,6 +165,7 @@ export default function WithdrawPage() {
             className="input-field font-mono text-sm"
           />
           <button
+            type="button"
             onClick={requestWithdraw}
             disabled={busy}
             className="btn-primary w-full disabled:opacity-60"

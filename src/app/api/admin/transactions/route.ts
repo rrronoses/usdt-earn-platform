@@ -3,6 +3,7 @@ import { getStorage } from '@/lib/memory-kv';
 import { ensureSeeded, listUsers, getUserTransactions } from '@/lib/kv';
 import { getAdminToken, parseToken } from '@/lib/auth';
 import type { Transaction } from '@/types';
+import { dedupeWithdrawalTransactions } from '@/lib/tx-utils';
 
 export const runtime = 'edge';
 
@@ -35,6 +36,9 @@ export async function GET(req: Request) {
     txs.sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1));
     txs = txs.slice(0, limit);
   }
+
+  txs = dedupeWithdrawalTransactions(txs);
+
   if (type) txs = txs.filter((t) => t.type === type);
   if (status) txs = txs.filter((t) => t.status === status);
   return NextResponse.json({ ok: true, transactions: txs });

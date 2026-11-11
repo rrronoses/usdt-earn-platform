@@ -10,6 +10,7 @@ import {
 } from '@/lib/kv';
 import { getUserToken, parseToken } from '@/lib/auth';
 import { planDailyEarn } from '@/types';
+import { dedupeWithdrawalTransactions } from '@/lib/tx-utils';
 
 export const runtime = 'edge';
 
@@ -29,13 +30,13 @@ export async function GET() {
     ...p,
     dailyEarn: planDailyEarn(p),
   }));
-  const transactions = await getUserTransactions(kv, user.id, 100);
+  const transactionsRaw = await getUserTransactions(kv, user.id, 100);
+  const transactions = dedupeWithdrawalTransactions(transactionsRaw);
   const config = await getConfig(kv);
   const catalogRaw = await listPlans(kv);
   const catalog = catalogRaw.map((p) => ({
     ...p,
     dailyEarn: planDailyEarn(p),
-    // keep legacy key for any old client code
     dailyYield: planDailyEarn(p),
   }));
 

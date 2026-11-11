@@ -26,8 +26,8 @@ function requireAdmin() {
   return p?.role === 'admin' ? p : null;
 }
 
-/** Update the original pending ledger row (same id as withdrawal) instead of creating a duplicate. */
-async function updateWithdrawalTx(
+/** Update every matching pending withdrawal ledger row so history shows one status only. */
+async function finalizeWithdrawalTxs(
   kv: Parameters<typeof getJSON>[0],
   wId: string,
   userId: string,
@@ -37,48 +37,39 @@ async function updateWithdrawalTx(
   address?: string
 ) {
   const now = new Date().toISOString();
-  // Prefer tx keyed by withdrawal id (set on request)
-  let tx = await getJSON<Transaction>(kv, keys.tx(wId));
+  const idx = (await getJSON<string[]>(kv, keys.userTxIndex(userId))) || [];
+  const ids = new Set<string>([wId, ...idx.slice(0, 80)]);
+  let updated = 0;
 
-  if (!tx) {
-    // Fallback: find any pending withdrawal tx for this user/amount
-    const idx = (await getJSON<string[]>(kv, keys.userTxIndex(userId))) || [];
-    for (const tid of idx.slice(0, 50)) {
-      const candidate = await getJSON<Transaction>(kv, keys.tx(tid));
-      if (
-        candidate &&
-        candidate.type === 'withdrawal' &&
-        candidate.status === 'pending' &&
-        Math.abs(Number(candidate.amount) - amount) < 0.000001
-      ) {
-        tx = candidate;
-        break;
-      }
+  for (const tid of Array.from(ids)) {
+    const candidate = await getJSON<Transaction>(kv, keys.tx(tid));
+    if (!candidate) continue;
+    if (candidate.type !== 'withdrawal') continue;
+    if (Math.abs(Number(candidate.amount) - amount) >= 0.000001) continue;
+
+    // Finalize pending rows, or rows that already match this withdrawal id
+    if (candidate.status === 'pending' || candidate.id === wId) {
+      candidate.status = status;
+      candidate.description = description;
+      candidate.timestamp = now;
+      if (address) candidate.address = address;
+      await putJSON(kv, keys.tx(candidate.id), candidate);
+      updated += 1;
     }
   }
 
-  if (tx) {
-    tx.status = status;
-    tx.description = description;
-    tx.timestamp = now;
-    if (address) tx.address = address;
-    await putJSON(kv, keys.tx(tx.id), tx);
-    return tx.id;
+  if (updated === 0) {
+    await saveTx(kv, {
+      id: wId,
+      userId,
+      type: 'withdrawal',
+      amount,
+      status,
+      description,
+      timestamp: now,
+      address,
+    } as Transaction);
   }
-
-  // Last resort: create one row only (should be rare)
-  const id = wId;
-  await saveTx(kv, {
-    id,
-    userId,
-    type: 'withdrawal',
-    amount,
-    status,
-    description,
-    timestamp: now,
-    address,
-  } as Transaction);
-  return id;
 }
 
 export async function GET() {
@@ -109,7 +100,7 @@ export async function POST(req: Request) {
     w.processedAt = now;
     await saveWithdrawal(kv, w);
 
-    await updateWithdrawalTx(
+    await finalizeWithdrawalTxs(
       kv,
       w.id,
       w.userId,
@@ -143,7 +134,7 @@ export async function POST(req: Request) {
       await saveUser(kv, user);
     }
 
-    await updateWithdrawalTx(
+    await finalizeWithdrawalTxs(
       kv,
       w.id,
       w.userId,
