@@ -40,6 +40,12 @@ const modules = [
     icon: '◎',
   },
   {
+    href: '/administrator/deposit-queue',
+    title: 'Deposit queue',
+    desc: 'Manual approve / reject pending TRC-20 deposits',
+    icon: '↑',
+  },
+  {
     href: '/administrator/withdrawals',
     title: 'Withdrawals',
     desc: 'Approve or reject pending TRC-20 payouts',
@@ -141,7 +147,9 @@ export default function AdminDashboardPage() {
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
             <AdminKpi label="Pending withdrawals" value={m.pendingWithdrawals} accent="amber" />
-            <AdminKpi label="Pending deposits" value={m.pendingDeposits} accent="amber" />
+            <Link href="/administrator/deposit-queue" className="block">
+              <AdminKpi label="Pending deposits" value={m.pendingDeposits} hint="Tap to review queue" accent="amber" />
+            </Link>
             <AdminKpi label="Deposit wallets" value={`${m.depositAddressesEnabled}/${m.depositAddressesTotal}`} accent="cyan" />
             <AdminKpi label="Active plans" value={m.plansActive} accent="emerald" />
           </div>

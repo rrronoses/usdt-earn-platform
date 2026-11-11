@@ -14,6 +14,8 @@ export default function PasswordPage() {
   const [newPass, setNewPass] = useState('');
   const [confirm, setConfirm] = useState('');
   const [msg, setMsg] = useState('');
+  const [err, setErr] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     fetch('/api/me')
@@ -24,23 +26,44 @@ export default function PasswordPage() {
       });
   }, [router]);
 
-  function submit() {
+  async function submit() {
+    setMsg('');
+    setErr(false);
     if (newPass.length < 6) {
       setMsg('Password too short (min 6)');
+      setErr(true);
       return;
     }
     if (newPass !== confirm) {
       setMsg('New passwords do not match');
+      setErr(true);
       return;
     }
     if (!curPass) {
       setMsg('Enter current password');
+      setErr(true);
       return;
     }
-    setMsg('Password change will be available after security module is enabled.');
-    setCurPass('');
-    setNewPass('');
-    setConfirm('');
+    setBusy(true);
+    try {
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword: curPass, newPassword: newPass }),
+      });
+      const d: any = await res.json();
+      setMsg(d.message || (d.ok ? 'Password updated' : 'Failed'));
+      setErr(!d.ok);
+      if (d.ok) {
+        setCurPass('');
+        setNewPass('');
+        setConfirm('');
+      }
+    } catch {
+      setMsg('Network error');
+      setErr(true);
+    }
+    setBusy(false);
   }
 
   if (!ready) {
@@ -64,7 +87,13 @@ export default function PasswordPage() {
         </div>
 
         {msg && (
-          <div className="p-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 text-sm text-center">
+          <div
+            className={`p-3 rounded-2xl border text-sm text-center ${
+              err
+                ? 'border-red-500/30 bg-red-500/10 text-red-500'
+                : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600'
+            }`}
+          >
             {msg}
           </div>
         )}
@@ -80,6 +109,7 @@ export default function PasswordPage() {
             onChange={(e) => setCurPass(e.target.value)}
             placeholder="Current password"
             className="input-field"
+            autoComplete="current-password"
           />
           <input
             type="password"
@@ -87,6 +117,7 @@ export default function PasswordPage() {
             onChange={(e) => setNewPass(e.target.value)}
             placeholder="New password (min 6)"
             className="input-field"
+            autoComplete="new-password"
           />
           <input
             type="password"
@@ -94,9 +125,10 @@ export default function PasswordPage() {
             onChange={(e) => setConfirm(e.target.value)}
             placeholder="Confirm new password"
             className="input-field"
+            autoComplete="new-password"
           />
-          <button onClick={submit} className="btn-primary w-full">
-            Update password
+          <button type="button" onClick={submit} disabled={busy} className="btn-primary w-full disabled:opacity-50">
+            {busy ? 'Updating…' : 'Update password'}
           </button>
         </div>
       </main>
