@@ -14,7 +14,14 @@ type TxRow = {
   description: string;
   timestamp: string;
   txHash?: string;
+  address?: string;
 };
+
+function shortAddr(addr?: string) {
+  if (!addr) return '—';
+  if (addr.length <= 14) return addr;
+  return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
+}
 
 export default function AdminTxPage() {
   const [type, setType] = useState('');
@@ -91,13 +98,14 @@ export default function AdminTxPage() {
               <th className="p-3 font-medium">Type</th>
               <th className="p-3 font-medium">Amount</th>
               <th className="p-3 font-medium">Status</th>
+              <th className="p-3 font-medium">TRC-20 address</th>
               <th className="p-3 font-medium">Detail</th>
             </tr>
           </thead>
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={6} className="p-8 text-center" style={{ color: 'var(--muted)' }}>
+                <td colSpan={7} className="p-8 text-center" style={{ color: 'var(--muted)' }}>
                   Loading…
                 </td>
               </tr>
@@ -121,14 +129,17 @@ export default function AdminTxPage() {
                   <td className="p-3">
                     <StatusBadge status={t.status} />
                   </td>
-                  <td className="p-3 text-xs max-w-[220px] truncate" title={t.description}>
+                  <td className="p-3 text-xs font-mono" title={t.address || ''}>
+                    {t.type === 'withdrawal' || t.type === 'deposit' ? shortAddr(t.address) : '—'}
+                  </td>
+                  <td className="p-3 text-xs max-w-[200px] truncate" title={t.description}>
                     {t.description}
                   </td>
                 </tr>
               ))}
             {!loading && txs.length === 0 && (
               <tr>
-                <td colSpan={6} className="p-8">
+                <td colSpan={7} className="p-8">
                   <EmptyState title="No transactions" hint="Try clearing filters." />
                 </td>
               </tr>

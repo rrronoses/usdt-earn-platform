@@ -56,13 +56,14 @@ export async function POST(req: Request) {
   };
   await saveWithdrawal(kv, w);
 
+  // Same id as withdrawal — admin approve/reject updates THIS row only
   await saveTx(kv, {
     id: w.id,
     userId: user.id,
     type: 'withdrawal',
     amount,
     status: 'pending',
-    description: `Withdrawal request ${amount} USDT`,
+    description: `Withdrawal request ${amount} USDT → ${destinationAddress}`,
     timestamp: now,
     address: destinationAddress,
   } as Transaction);

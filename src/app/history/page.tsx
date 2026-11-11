@@ -7,6 +7,12 @@ import { UserNav } from '@/components/UserNav';
 import { useThemeLang } from '@/components/ThemeLangProvider';
 import { txTypeLabel } from '@/lib/labels';
 
+function shortAddr(addr?: string) {
+  if (!addr) return '';
+  if (addr.length <= 18) return addr;
+  return `${addr.slice(0, 10)}…${addr.slice(-6)}`;
+}
+
 export default function HistoryPage() {
   const router = useRouter();
   const { t } = useThemeLang();
@@ -68,6 +74,11 @@ export default function HistoryPage() {
                 <p className="text-[11px] mt-0.5" style={{ color: 'var(--muted)' }}>
                   {new Date(tx.timestamp).toLocaleString()} · {txTypeLabel(tx.type)} · {tx.status}
                 </p>
+                {tx.address && (
+                  <p className="text-[11px] font-mono mt-0.5 break-all" style={{ color: 'var(--muted)' }} title={tx.address}>
+                    TRC-20: {shortAddr(tx.address)}
+                  </p>
+                )}
               </div>
               <span
                 className={`font-mono shrink-0 font-semibold ${

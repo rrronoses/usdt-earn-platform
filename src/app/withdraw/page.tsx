@@ -13,6 +13,7 @@ type Tx = {
   status: string;
   description: string;
   timestamp: string;
+  address?: string;
 };
 
 function rankStatus(s: string) {
@@ -21,7 +22,6 @@ function rankStatus(s: string) {
   return 1;
 }
 
-/** One row per withdrawal amount/day (hide stale pending when approved exists). */
 function uniqueWithdrawals(list: Tx[]): Tx[] {
   const map = new Map<string, Tx>();
   for (const tx of list) {
@@ -32,9 +32,13 @@ function uniqueWithdrawals(list: Tx[]): Tx[] {
       map.set(key, tx);
     }
   }
-  return Array.from(map.values()).sort((a, b) =>
-    a.timestamp < b.timestamp ? 1 : -1
-  );
+  return Array.from(map.values()).sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1));
+}
+
+function shortAddr(addr?: string) {
+  if (!addr) return '';
+  if (addr.length <= 16) return addr;
+  return `${addr.slice(0, 8)}…${addr.slice(-6)}`;
 }
 
 export default function WithdrawPage() {
@@ -177,23 +181,31 @@ export default function WithdrawPage() {
         <div className="panel-card overflow-hidden">
           <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border)' }}>
             <h2 className="font-semibold">Withdrawal history</h2>
+            <p className="text-[11px] mt-0.5" style={{ color: 'var(--muted)' }}>
+              Pending updates to Approved or Rejected after admin review
+            </p>
           </div>
           {withdrawals.length === 0 ? (
             <p className="p-4 text-sm text-center" style={{ color: 'var(--muted)' }}>
               {t.noData}
             </p>
           ) : (
-            <div className="divide-y max-h-72 overflow-y-auto" style={{ borderColor: 'var(--border)' }}>
+            <div className="divide-y max-h-80 overflow-y-auto" style={{ borderColor: 'var(--border)' }}>
               {withdrawals.map((tx) => (
-                <div key={tx.id} className="px-4 py-2.5 flex justify-between text-sm gap-2">
-                  <div>
+                <div key={tx.id} className="px-4 py-3 flex justify-between text-sm gap-2">
+                  <div className="min-w-0">
                     <p className="font-medium">{tx.amount} USDT</p>
-                    <p className="text-[11px]" style={{ color: 'var(--muted)' }}>
+                    {tx.address && (
+                      <p className="text-[11px] font-mono break-all mt-0.5" style={{ color: 'var(--muted)' }} title={tx.address}>
+                        TRC-20: {shortAddr(tx.address)}
+                      </p>
+                    )}
+                    <p className="text-[11px] mt-0.5" style={{ color: 'var(--muted)' }}>
                       {new Date(tx.timestamp).toLocaleString()}
                     </p>
                   </div>
                   <span
-                    className={`text-xs font-semibold capitalize self-center ${
+                    className={`text-xs font-semibold capitalize self-center shrink-0 ${
                       tx.status === 'approved' || tx.status === 'completed'
                         ? 'text-emerald-500'
                         : tx.status === 'rejected'

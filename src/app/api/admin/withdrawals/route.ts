@@ -26,7 +26,7 @@ function requireAdmin() {
   return p?.role === 'admin' ? p : null;
 }
 
-/** Update every matching pending withdrawal ledger row so history shows one status only. */
+/** Update matching withdrawal ledger rows in place (pending → approved/rejected). */
 async function finalizeWithdrawalTxs(
   kv: Parameters<typeof getJSON>[0],
   wId: string,
@@ -47,7 +47,6 @@ async function finalizeWithdrawalTxs(
     if (candidate.type !== 'withdrawal') continue;
     if (Math.abs(Number(candidate.amount) - amount) >= 0.000001) continue;
 
-    // Finalize pending rows, or rows that already match this withdrawal id
     if (candidate.status === 'pending' || candidate.id === wId) {
       candidate.status = status;
       candidate.description = description;
@@ -94,6 +93,7 @@ export async function POST(req: Request) {
   }
 
   const now = new Date().toISOString();
+  const addr = w.destinationAddress;
 
   if (action === 'approve') {
     w.status = 'approved';
@@ -106,8 +106,8 @@ export async function POST(req: Request) {
       w.userId,
       w.amount,
       'approved',
-      `Withdrawal approved ${w.amount} USDT`,
-      w.destinationAddress
+      `Withdrawal approved ${w.amount} USDT → ${addr}`,
+      addr
     );
 
     try {
@@ -140,8 +140,8 @@ export async function POST(req: Request) {
       w.userId,
       w.amount,
       'rejected',
-      `Withdrawal rejected — refunded ${w.amount} USDT`,
-      w.destinationAddress
+      `Withdrawal rejected ${w.amount} USDT → ${addr} (refunded)`,
+      addr
     );
 
     return NextResponse.json({ ok: true, message: 'Rejected and refunded' });
