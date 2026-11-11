@@ -8,6 +8,7 @@ import { ThemeLangToggles, useThemeLang } from './ThemeLangProvider';
 const links = [
   { href: '/administrator/dashboard', label: 'Overview', icon: '▣' },
   { href: '/administrator/users', label: 'Users', icon: '◎' },
+  { href: '/administrator/deposit-queue', label: 'Deposits', icon: '↑' },
   { href: '/administrator/withdrawals', label: 'Withdrawals', icon: '↓' },
   { href: '/administrator/transactions', label: 'Ledger', icon: '⇄' },
   { href: '/administrator/plans', label: 'Plans', icon: '◈' },
